@@ -59,6 +59,7 @@ const api = {
 const backendModeKey = "gsil-backend-mode";
 const backendUrlKey = "gsil-backend-url";
 const pendingVendorDraftsKey = "gsil-pending-vendor-drafts";
+const clientVendorOverlayKey = "gsil-client-visible-vendors";
 const productionBackendUrl = "https://gsil-backend.onrender.com";
 const hostedFrontendHosts = ["tecky06.github.io", "gsil-tool.netlify.app"];
 const defaultBackendUrl = hostedFrontendHosts.includes(window.location.hostname)
@@ -625,7 +626,10 @@ function currentSession() {
 
 function pendingVendorDrafts() {
   try {
-    return JSON.parse(localStorage.getItem(pendingVendorDraftsKey) || "[]").map(normalizeApiVendor);
+    const pending = JSON.parse(localStorage.getItem(pendingVendorDraftsKey) || "[]");
+    const overlay = JSON.parse(localStorage.getItem(clientVendorOverlayKey) || "[]");
+    const byName = new Map([...overlay, ...pending].map((vendor) => [String(vendor.name || "").toLowerCase(), vendor]));
+    return Array.from(byName.values()).map(normalizeApiVendor);
   } catch {
     return [];
   }
@@ -637,12 +641,14 @@ function savePendingVendorDraft(vendor) {
     ...pendingVendorDrafts().filter((item) => item.id !== vendor.id && item.name.toLowerCase() !== vendor.name.toLowerCase())
   ].slice(0, 20);
   localStorage.setItem(pendingVendorDraftsKey, JSON.stringify(drafts));
+  localStorage.setItem(clientVendorOverlayKey, JSON.stringify(drafts));
 }
 
 function removePendingVendorDraft(localId, vendorName) {
   const lowerName = String(vendorName || "").toLowerCase();
   const drafts = pendingVendorDrafts().filter((item) => item.id !== localId && item.name.toLowerCase() !== lowerName);
   localStorage.setItem(pendingVendorDraftsKey, JSON.stringify(drafts));
+  localStorage.setItem(clientVendorOverlayKey, JSON.stringify(drafts));
 }
 
 function mergePendingVendorDrafts(vendors = []) {
@@ -3602,9 +3608,6 @@ function bindGlobalEvents() {
     api.addVendor(vendor).then(async (result) => {
       if (result?.state) {
         state = { ...state, ...normalizeApiPayload(result.state) };
-        if (state.vendors.some((item) => item.name.toLowerCase() === vendor.name.toLowerCase() && item.id !== visibleDraft.id)) {
-          removePendingVendorDraft(visibleDraft.id, vendor.name);
-        }
         state.vendors = mergePendingVendorDrafts(state.vendors);
         showAllVendorsBeforeRender();
         renderSelects();
@@ -3614,7 +3617,6 @@ function bindGlobalEvents() {
         return;
       }
       if (result?.vendor) {
-        removePendingVendorDraft(visibleDraft.id, result.vendor.name);
         state.vendors = [
           result.vendor,
           ...state.vendors.filter((item) => item.id !== visibleDraft.id && item.id !== result.vendor.id)

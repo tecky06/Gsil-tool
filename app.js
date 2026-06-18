@@ -679,10 +679,13 @@ async function signIn(event) {
   $("#loginError").textContent = "";
   setSession(user);
   hideLogin();
-  await refreshWithFallback();
   setActiveView(defaultViewForRole(user.role));
   startAutoPullLoop();
   toast(`Signed in as ${roleLabels[user.role]}`);
+  refreshWithFallback().catch((error) => {
+    console.error("GSIL background refresh failed", error);
+    toast(`Signed in, but data could not load: ${error.message}`);
+  });
 }
 
 function signOut() {
@@ -706,9 +709,12 @@ async function boot() {
   }
   state.currentUser = { name: session.name, role: session.role, email: session.username };
   hideLogin();
-  await refreshWithFallback();
   setActiveView(defaultViewForRole(session.role));
   startAutoPullLoop();
+  refreshWithFallback().catch((error) => {
+    console.error("GSIL background refresh failed", error);
+    toast(`Signed in, but data could not load: ${error.message}`);
+  });
 }
 
 function vendorById(id) {

@@ -1887,6 +1887,15 @@ function renderVendorCards() {
   }).join("") || `<article class="risk-item"><strong>No matches</strong><p>Try a different search or status filter.</p></article>`;
 }
 
+function showAllVendorsBeforeRender() {
+  state.activeFilter = "all";
+  const search = $("#globalSearch");
+  if (search) search.value = "";
+  $$(".segmented button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.filter === "all");
+  });
+}
+
 function renderVendorTable() {
   $("#vendorTable").innerHTML = state.vendors.map((vendor) => `
     <article class="table-row interactive-item" role="button" tabindex="0" data-open-vendor="${vendor.id}">
@@ -3507,7 +3516,13 @@ function bindGlobalEvents() {
     };
     action("New vendor added", () => api.addVendor(vendor)).then(async (result) => {
       event.target.reset();
-      if (result?.state) return;
+      showAllVendorsBeforeRender();
+      if (result?.state) {
+        renderVendorCards();
+        renderVendorTable();
+        setActiveView("vendors");
+        return;
+      }
       if (result?.vendor) {
         state.vendors = [
           result.vendor,

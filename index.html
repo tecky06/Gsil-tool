@@ -518,7 +518,10 @@
             <p class="eyebrow">Client Walkthrough</p>
             <h2 id="demoScriptTitle">Show-this-to-client demo path</h2>
           </div>
-          <button class="primary-btn" id="launchDemoScriptBtn" type="button">Launch guided path</button>
+          <div class="button-row">
+            <button class="secondary-btn" id="resetDemoBtn" type="button">Reset demo state</button>
+            <button class="primary-btn" id="launchDemoScriptBtn" type="button">Launch guided path</button>
+          </div>
         </div>
         <div id="demoScriptSteps" class="demo-script-steps"></div>
       </section>
@@ -758,7 +761,10 @@
             <p class="eyebrow">Admin Settings</p>
             <h2 id="settingsTitle">Thresholds, schedules, and governance defaults</h2>
           </div>
-          <button class="primary-btn" id="saveSettingsBtn" type="button">Save settings</button>
+          <div class="button-row">
+            <button class="secondary-btn" id="resetDemoSettingsBtn" type="button">Reset demo state</button>
+            <button class="primary-btn" id="saveSettingsBtn" type="button">Save settings</button>
+          </div>
         </div>
         <div class="settings-grid">
           <section class="panel settings-panel">
@@ -868,7 +874,7 @@
         <div class="modal-content" id="actionModalContent"></div>
       </section>
     </div>
-    <script src="static-api.js?v=20260619-vendor-refresh-persist"></script>
-    <script src="app.js?v=20260619-vendor-refresh-persist"></script>
+    <script src="static-api.js?v=20260619-demo-reset"></script>
+    <script src="app.js?v=20260619-demo-reset"></script>
   </body>
 </html>

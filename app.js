@@ -661,6 +661,23 @@ function mergePendingVendorDrafts(vendors = []) {
   ];
 }
 
+async function resetDemoState() {
+  if (!requireUiPermission("settings:write", "Only Admin can reset the demo state.")) return;
+  [
+    pendingVendorDraftsKey,
+    clientVendorOverlayKey,
+    "gsil-static-demo-db-v2",
+    "gsil-action-tasks",
+    "gsil-decision-log",
+    "gsil-last-auto-pull"
+  ].forEach((key) => localStorage.removeItem(key));
+  demoGuide = { active: false, step: 0 };
+  showAllVendorsBeforeRender();
+  await refreshWithFallback();
+  setActiveView("dashboard");
+  toast("Demo state reset");
+}
+
 function can(permission) {
   const role = state.currentUser?.role || currentSession()?.role || "viewer";
   return (rolePermissions[role] || []).includes(permission);
@@ -2279,7 +2296,9 @@ function applyPermissionState() {
     ["#sourceForm button[type='submit']", "source:write", "Only Admin and Analyst can add sources."],
     ["#internalForm button[type='submit']", "internal:write", "Only Admin, Analyst, and Finance Controller can add internal evidence."],
     ["#qbrBtn", "qbr:write", "This role cannot generate QBR snapshots."],
-    ["#autoPullToggle", "settings:write", "Only Admin can pause or resume auto-pull."]
+    ["#autoPullToggle", "settings:write", "Only Admin can pause or resume auto-pull."],
+    ["#resetDemoBtn", "settings:write", "Only Admin can reset the demo state."],
+    ["#resetDemoSettingsBtn", "settings:write", "Only Admin can reset the demo state."]
   ];
   controls.forEach(([selector, permission, title]) => {
     const element = $(selector);
@@ -3479,6 +3498,8 @@ function bindGlobalEvents() {
     showDemoStep();
     toast("Client demo script launched");
   });
+  on("#resetDemoBtn", "click", resetDemoState);
+  on("#resetDemoSettingsBtn", "click", resetDemoState);
   on("#internalWeight", "input", () => {
     const value = Number($("#internalWeight").value);
     $("#internalWeightValue").textContent = `${value}% internal / ${100 - value}% external`;

@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GSIL - Global Signal Intelligence Layer</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark">G</span>
+          <div>
+            <strong>GSIL</strong>
+            <small>Demo sign in</small>
+          </div>
+        </div>
+        <h1>Sign in to GSIL</h1>
+        <p class="login-copy">Use one of the demo accounts below to see how permissions change by role.</p>
+        <form id="loginForm" class="login-form">
+          <label>
+            Username
+            <input id="loginUsername" type="text" autocomplete="username" required>
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="primary-btn" type="submit">Sign in</button>
+          <p class="login-error" id="loginError" role="alert"></p>
+        </form>
+        <div class="demo-accounts">
+          <strong>Demo accounts</strong>
+          <code>admin@gsil.demo / Admin@123</code>
+          <code>head@gsil.demo / Head@123</code>
+          <code>analyst@gsil.demo / Analyst@123</code>
+          <code>finance@gsil.demo / Finance@123</code>
+          <code>viewer@gsil.demo / Viewer@123</code>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <span class="brand-mark">G</span>
+        <div>
+          <strong>GSIL</strong>
+          <small>Signal Intelligence</small>
+        </div>
+      </div>
+      <nav class="nav-list">
+        <button class="nav-item active" data-view="dashboard" type="button">Dashboard</button>
+        <button class="nav-item" data-view="vendors" type="button">Vendors</button>
+        <button class="nav-item" data-view="signals" type="button">Approval Gate</button>
+        <button class="nav-item" data-view="copilot" type="button">Copilot</button>
+        <button class="nav-item" data-view="watchlist" type="button">Executive Watchlist</button>
+        <button class="nav-item" data-view="tasks" type="button">Task Board</button>
+        <button class="nav-item" data-view="compare" type="button">Compare</button>
+        <button class="nav-item" data-view="client" type="button">Client View</button>
+        <button class="nav-item" data-view="pilot" type="button">Pilot Readiness</button>
+        <button class="nav-item" data-view="roleWorkspace" type="button">Role Workspace</button>
+        <button class="nav-item" data-view="explainability" type="button">Explainability</button>
+        <button class="nav-item" data-view="demoScript" type="button">Demo Script</button>
+        <button class="nav-item" data-view="production" type="button">Production</button>
+        <button class="nav-item" data-view="riskCompliance" type="button">Risk & Compliance</button>
+        <button class="nav-item" data-view="commercialIntel" type="button">Commercial Intel</button>
+        <button class="nav-item" data-view="contractRenewal" type="button">Contract & Renewal</button>
+        <button class="nav-item" data-view="decisionAutomation" type="button">Decision Automation</button>
+        <button class="nav-item" data-view="benchmarkScenario" type="button">Benchmarking</button>
+        <button class="nav-item" data-view="sources" type="button">Sources</button>
+        <button class="nav-item" data-view="internal" type="button">Internal Gate</button>
+        <button class="nav-item" data-view="connectors" type="button">Connectors</button>
+        <button class="nav-item" data-view="settings" type="button">Settings</button>
+        <button class="nav-item" data-view="monitoring" type="button">Monitoring</button>
+        <button class="nav-item" data-view="audit" type="button">Audit Trail</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="live-dot"></span>
+        <div>
+          <strong id="autoPullStatus">Auto-pull active</strong>
+          <small id="autoPullDetail">Client-controlled pull cadence</small>
+        </div>
+        <button class="auto-pull-toggle" id="autoPullToggle" type="button">Pause</button>
+      </div>
+    </aside>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Amadeus GCC Vendor Intelligence</p>
+          <h1>Global Signal Intelligence Layer</h1>
+        </div>
+        <label class="search">
+          <span>Search</span>
+          <input id="globalSearch" type="search" placeholder="Find vendor, signal, source">
+        </label>
+        <button class="icon-btn" id="notifyBtn" type="button" aria-label="Notifications">
+          <span class="bell"></span>
+          <b id="notificationCount">6</b>
+        </button>
+        <label class="role-switcher">
+          <span>Signed in</span>
+          <select id="roleSwitcher" aria-label="Signed-in role" disabled>
+            <option value="procurement_head">Procurement Head</option>
+            <option value="analyst">Analyst</option>
+            <option value="admin">Admin</option>
+            <option value="finance_controller">Finance Controller</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </label>
+        <button class="secondary-btn" id="logoutBtn" type="button">Sign out</button>
+      </header>
+
+      <section id="dashboard" class="view active" aria-labelledby="dashboardTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Executive View</p>
+            <h2 id="dashboardTitle">Monday morning vendor truth</h2>
+          </div>
+          <div class="action-row">
+            <button class="secondary-btn" id="startDemoBtn" type="button">Start guided demo</button>
+            <button class="primary-btn" id="runPullBtn" type="button">Run credible pull now</button>
+          </div>
+        </div>
+
+        <div class="metric-grid" id="metricGrid"></div>
+
+        <section class="panel client-brief">
+          <div class="section-title">
+            <h3>Client Confidence Brief</h3>
+            <span>Why this matters</span>
+          </div>
+          <div id="clientBrief" class="client-brief-grid"></div>
+        </section>
+
+        <section class="panel demo-guide" id="demoGuide" hidden>
+          <div class="section-title">
+            <h3>Guided Demo Mode</h3>
+            <span id="demoStepCount">Step 1 of 5</span>
+          </div>
+          <div class="demo-guide-body">
+            <div>
+              <strong id="demoStepTitle">Start with the portfolio truth view</strong>
+              <p id="demoStepText">Use this guided path to walk your team through one procurement story from signal to decision.</p>
+            </div>
+            <div class="action-row">
+              <button class="secondary-btn" id="demoBackBtn" type="button">Back</button>
+              <button class="primary-btn" id="demoNextBtn" type="button">Next step</button>
+              <button class="secondary-btn" id="demoExitBtn" type="button">Exit</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="panel portfolio-panel">
+            <div class="section-title">
+              <h3>Portfolio Health</h3>
+              <span id="portfolioUpdated">Live</span>
+            </div>
+            <div class="portfolio-bars" id="portfolioBars"></div>
+            <div class="portfolio-insights" id="portfolioInsights"></div>
+            <div class="portfolio-actions" id="portfolioActions"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h3>Top Risks This Week</h3>
+              <span>AI relevance gated</span>
+            </div>
+            <div id="riskList" class="risk-list"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="section-title">
+            <h3>Executive Action Cockpit</h3>
+            <span>Recommended next moves</span>
+          </div>
+          <div class="action-cockpit" id="actionCockpit"></div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Vendor 360</h3>
+              <select id="vendor360Select" aria-label="Vendor 360 vendor"></select>
+            </div>
+            <div id="vendor360Panel"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Scenario Simulator</h3>
+              <span>What-if PRISM movement</span>
+            </div>
+            <div class="scenario-tool">
+              <label>
+                Vendor
+                <select id="scenarioVendor"></select>
+              </label>
+              <label>
+                Scenario
+                <select id="scenarioType">
+                  <option value="sla-delay">Delivery SLA pressure</option>
+                  <option value="coupa-savings">Coupa savings improvement</option>
+                  <option value="invoice-risk">Invoice exception spike</option>
+                  <option value="specialist-capacity">Specialist capacity improvement</option>
+                </select>
+              </label>
+              <button class="secondary-btn" id="runScenarioBtn" type="button">Run scenario</button>
+              <div id="scenarioResult" class="scenario-result"></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Vendor Risk Heatmap</h3>
+              <span>PRISM concentration view</span>
+            </div>
+            <div id="riskHeatmap" class="heatmap"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Business Value Tracker</h3>
+              <span>Demo benefits</span>
+            </div>
+            <div id="businessValueTracker" class="value-tracker"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="section-title">
+            <h3>Vendor Scorecards</h3>
+            <div class="segmented">
+              <button class="active" data-filter="all" type="button">All</button>
+              <button data-filter="red" type="button">Executive Attention</button>
+              <button data-filter="amber" type="button">Performance Watch</button>
+              <button data-filter="green" type="button">Strategic Advantage</button>
+            </div>
+          </div>
+          <div class="vendor-grid" id="vendorGrid"></div>
+        </section>
+      </section>
+
+      <section id="vendors" class="view" aria-labelledby="vendorsTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Vendor Control</p>
+            <h2 id="vendorsTitle">Schedules, specialist handling, and PRISM weights</h2>
+          </div>
+        </div>
+        <form class="vendor-form panel" id="vendorForm">
+          <input id="vendorName" type="text" placeholder="Vendor name" required>
+          <input id="vendorCategory" type="text" placeholder="Category" required>
+          <select id="vendorTier">
+            <option>Strategic</option>
+            <option>Core</option>
+            <option>Specialist</option>
+            <option>Watchlist</option>
+            <option>Tactical</option>
+          </select>
+          <select id="vendorSchedule">
+            <option>Daily</option>
+            <option>Weekly</option>
+            <option>Manual</option>
+          </select>
+          <label class="toggle vendor-specialist">
+            <input id="vendorSpecialist" type="checkbox">
+            Specialist
+          </label>
+          <button class="primary-btn" type="submit">Add vendor</button>
+        </form>
+        <div class="vendor-table" id="vendorTable"></div>
+      </section>
+
+      <section id="signals" class="view" aria-labelledby="signalsTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Human Approval Gate</p>
+            <h2 id="signalsTitle">Review signals before they move scores</h2>
+          </div>
+          <div class="action-row">
+            <button class="secondary-btn" id="bulkRejectBtn" type="button">Reject low confidence</button>
+            <button class="primary-btn" id="bulkApproveBtn" type="button">Approve high confidence</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <select id="signalTypeFilter" aria-label="Signal type">
+            <option value="all">All signal types</option>
+            <option value="Financial">Financial</option>
+            <option value="Operational">Operational</option>
+            <option value="Risk">Risk</option>
+            <option value="People">People</option>
+          </select>
+          <select id="signalSentimentFilter" aria-label="Signal sentiment">
+            <option value="all">All sentiment</option>
+            <option value="Positive">Positive</option>
+            <option value="Negative">Negative</option>
+          </select>
+          <select id="signalVendorFilter" aria-label="Signal vendor"></select>
+        </div>
+        <div class="signal-list" id="signalList"></div>
+      </section>
+
+      <section id="copilot" class="view" aria-labelledby="copilotTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Procurement Copilot</p>
+            <h2 id="copilotTitle">Ask operational questions about the vendor portfolio</h2>
+          </div>
+          <button class="primary-btn" id="copilotCreateTaskBtn" type="button">Create task from answer</button>
+        </div>
+        <div class="copilot-grid">
+          <section class="panel copilot-panel">
+            <div class="section-title">
+              <h3>Quick Questions</h3>
+              <span>Grounded in current GSIL data</span>
+            </div>
+            <div class="copilot-prompts" id="copilotPrompts"></div>
+          </section>
+          <section class="panel copilot-panel">
+            <div class="section-title">
+              <h3>Answer</h3>
+              <span id="copilotAnswerMeta">Ready</span>
+            </div>
+            <div class="copilot-answer" id="copilotAnswer"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="watchlist" class="view" aria-labelledby="watchlistTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Executive Control</p>
+            <h2 id="watchlistTitle">Watchlist decisions, owners, and QBR readiness</h2>
+          </div>
+          <button class="primary-btn" id="watchlistCreateReviewBtn" type="button">Create review tasks</button>
+        </div>
+        <div class="metric-grid" id="watchlistMetrics"></div>
+        <div id="watchlistGrid" class="watchlist-grid"></div>
+      </section>
+
+      <section id="tasks" class="view" aria-labelledby="tasksTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Procurement Execution</p>
+            <h2 id="tasksTitle">Task board for signal follow-through</h2>
+          </div>
+          <button class="primary-btn" id="addDemoTaskBtn" type="button">Add demo task</button>
+        </div>
+        <div class="task-board" id="taskBoard"></div>
+      </section>
+
+      <section id="compare" class="view" aria-labelledby="compareTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Sourcing Support</p>
+            <h2 id="compareTitle">Compare vendors side by side</h2>
+          </div>
+        </div>
+        <div class="compare-controls panel">
+          <label>Vendor A<select id="compareVendorA"></select></label>
+          <label>Vendor B<select id="compareVendorB"></select></label>
+          <label>Vendor C<select id="compareVendorC"></select></label>
+        </div>
+        <div id="compareMatrix" class="compare-matrix"></div>
+      </section>
+
+      <section id="client" class="view" aria-labelledby="clientTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Client Decision View</p>
+            <h2 id="clientTitle">Value, trust, and adoption story</h2>
+          </div>
+          <button class="primary-btn" id="exportClientBriefBtn" type="button">Export client brief</button>
+        </div>
+        <div class="client-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Stakeholder Lenses</h3>
+              <span>What each team gets</span>
+            </div>
+            <div id="stakeholderLenses" class="stakeholder-lenses"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Trust & Controls</h3>
+              <span>Why scores are defensible</span>
+            </div>
+            <div id="trustControls" class="trust-controls"></div>
+          </section>
+        </div>
+        <div class="client-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Data Lineage</h3>
+              <span>From source to decision</span>
+            </div>
+            <div id="dataLineage" class="data-lineage"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Pilot Outcomes</h3>
+              <span>What client should expect</span>
+            </div>
+            <div id="pilotOutcomes" class="pilot-outcomes"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="pilot" class="view" aria-labelledby="pilotTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Production Pilot</p>
+            <h2 id="pilotTitle">Pilot readiness and business case</h2>
+          </div>
+          <button class="primary-btn" id="exportPilotBtn" type="button">Export pilot summary</button>
+        </div>
+        <div class="pilot-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Readiness Checklist</h3>
+              <span>What we need next</span>
+            </div>
+            <div id="pilotChecklist" class="pilot-checklist"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Pilot Value Case</h3>
+              <span>Business impact estimate</span>
+            </div>
+            <div id="pilotValueCase" class="pilot-value-case"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>Integration Plan</h3>
+            <span>Client-friendly production path</span>
+          </div>
+          <div id="pilotIntegrationPlan" class="pilot-roadmap"></div>
+        </section>
+      </section>
+
+      <section id="roleWorkspace" class="view" aria-labelledby="roleWorkspaceTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Role-Based Workflow</p>
+            <h2 id="roleWorkspaceTitle">Personalized workspace by signed-in role</h2>
+          </div>
+          <button class="primary-btn" id="rolePrimaryActionBtn" type="button">Open my priority queue</button>
+        </div>
+        <div class="role-workspace-grid">
+          <section class="panel role-hero-panel">
+            <div class="section-title">
+              <h3 id="roleWorkspaceName">Current workspace</h3>
+              <span id="roleWorkspaceScope">Role scope</span>
+            </div>
+            <div id="roleWorkspaceSummary" class="role-workspace-summary"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Allowed Actions</h3>
+              <span>Permission-aware demo</span>
+            </div>
+            <div id="roleAllowedActions" class="permission-list"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>My Work Queue</h3>
+            <span id="roleQueueCount">0 items</span>
+          </div>
+          <div id="roleQueue" class="role-queue"></div>
+        </section>
+      </section>
+
+      <section id="explainability" class="view" aria-labelledby="explainabilityTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Transparent Scoring</p>
+            <h2 id="explainabilityTitle">Why a vendor score changed</h2>
+          </div>
+          <label class="compact-select">
+            Vendor
+            <select id="explainVendor"></select>
+          </label>
+        </div>
+        <div class="explainability-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Score Explanation</h3>
+              <span id="explainScoreLabel">PRISM movement</span>
+            </div>
+            <div id="explainScorePanel" class="explain-score-panel"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Evidence Mix</h3>
+              <span>Internal vs external</span>
+            </div>
+            <div id="evidenceMixPanel" class="evidence-mix-panel"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>Decision Lineage</h3>
+            <span>Source to score to audit</span>
+          </div>
+          <div id="decisionLineagePanel" class="decision-lineage-panel"></div>
+        </section>
+      </section>
+
+      <section id="demoScript" class="view" aria-labelledby="demoScriptTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Client Walkthrough</p>
+            <h2 id="demoScriptTitle">Show-this-to-client demo path</h2>
+          </div>
+          <button class="primary-btn" id="launchDemoScriptBtn" type="button">Launch guided path</button>
+        </div>
+        <div id="demoScriptSteps" class="demo-script-steps"></div>
+      </section>
+
+      <section id="production" class="view" aria-labelledby="productionTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Production Readiness</p>
+            <h2 id="productionTitle">What is needed before real rollout</h2>
+          </div>
+          <button class="primary-btn" id="exportProductionBtn" type="button">Export readiness checklist</button>
+        </div>
+        <div class="production-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Readiness Score</h3>
+              <span>Demo to pilot gap</span>
+            </div>
+            <div id="productionScorePanel" class="production-score-panel"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Decision Gates</h3>
+              <span>Approval path</span>
+            </div>
+            <div id="productionGatePanel" class="production-gate-panel"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>Production Checklist</h3>
+            <span>Client approval pack inputs</span>
+          </div>
+          <div id="productionChecklist" class="production-checklist"></div>
+        </section>
+      </section>
+
+      <section id="riskCompliance" class="view" aria-labelledby="riskComplianceTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Benchmark Capability Group</p>
+            <h2 id="riskComplianceTitle">Risk & Compliance intelligence</h2>
+          </div>
+          <button class="primary-btn" data-benchmark-nav="monitoring" type="button">Open monitoring</button>
+        </div>
+        <div class="benchmark-hero" id="riskComplianceHero"></div>
+        <div class="benchmark-feature-grid" id="riskComplianceFeatures"></div>
+      </section>
+
+      <section id="commercialIntel" class="view" aria-labelledby="commercialIntelTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Benchmark Capability Group</p>
+            <h2 id="commercialIntelTitle">Commercial intelligence</h2>
+          </div>
+          <button class="primary-btn" data-benchmark-nav="compare" type="button">Open compare</button>
+        </div>
+        <div class="benchmark-hero" id="commercialIntelHero"></div>
+        <div class="benchmark-feature-grid" id="commercialIntelFeatures"></div>
+      </section>
+
+      <section id="contractRenewal" class="view" aria-labelledby="contractRenewalTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Benchmark Capability Group</p>
+            <h2 id="contractRenewalTitle">Contract & Renewal intelligence</h2>
+          </div>
+          <button class="primary-btn" data-benchmark-nav="audit" type="button">Open QBR/audit</button>
+        </div>
+        <div class="benchmark-hero" id="contractRenewalHero"></div>
+        <div class="benchmark-feature-grid" id="contractRenewalFeatures"></div>
+      </section>
+
+      <section id="decisionAutomation" class="view" aria-labelledby="decisionAutomationTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Benchmark Capability Group</p>
+            <h2 id="decisionAutomationTitle">Decision automation</h2>
+          </div>
+          <button class="primary-btn" data-benchmark-nav="explainability" type="button">Open explainability</button>
+        </div>
+        <div class="benchmark-hero" id="decisionAutomationHero"></div>
+        <div class="benchmark-feature-grid" id="decisionAutomationFeatures"></div>
+      </section>
+
+      <section id="benchmarkScenario" class="view" aria-labelledby="benchmarkScenarioTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Benchmark Capability Group</p>
+            <h2 id="benchmarkScenarioTitle">Benchmarking & Scenario planning</h2>
+          </div>
+          <button class="primary-btn" data-benchmark-nav="dashboard" type="button">Open scenario simulator</button>
+        </div>
+        <div class="benchmark-hero" id="benchmarkScenarioHero"></div>
+        <div class="benchmark-feature-grid" id="benchmarkScenarioFeatures"></div>
+      </section>
+
+      <section id="sources" class="view" aria-labelledby="sourcesTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Client Source Library</p>
+            <h2 id="sourcesTitle">Manage credible signal sources</h2>
+          </div>
+        </div>
+        <form class="source-form" id="sourceForm">
+          <input id="sourceName" type="text" placeholder="Source name" required>
+          <input id="sourceUrl" type="url" placeholder="https://source.example" required>
+          <select id="sourceCategory">
+            <option>Financial News</option>
+            <option>Industry Data</option>
+            <option>Regulatory</option>
+            <option>People Data</option>
+            <option>Business News</option>
+          </select>
+          <select id="sourceConfidence">
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
+          <button class="primary-btn" type="submit">Add source</button>
+        </form>
+        <div class="source-list" id="sourceList"></div>
+        <section class="panel source-governance-panel">
+          <div class="section-title">
+            <h3>Source Trust Governance</h3>
+            <span>How source trust affects scoring</span>
+          </div>
+          <div id="sourceGovernance" class="source-governance"></div>
+        </section>
+      </section>
+
+      <section id="internal" class="view" aria-labelledby="internalTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Amadeus Internal Data Gate</p>
+            <h2 id="internalTitle">Upload or paste internal vendor evidence</h2>
+          </div>
+        </div>
+        <div class="internal-grid">
+          <form class="internal-form panel" id="internalForm">
+            <label>
+              Vendor
+              <select id="internalVendor"></select>
+            </label>
+            <label>
+              PRISM dimension
+              <select id="internalDimension">
+                <option value="P">P - Performance</option>
+                <option value="R">R - Risk Profile</option>
+                <option value="I">I - Integration</option>
+                <option value="S">S - Score & Value</option>
+                <option value="M">M - Market Fit</option>
+              </select>
+            </label>
+            <label>
+              Internal influence
+              <input id="internalWeight" type="range" min="10" max="60" value="30">
+              <span id="internalWeightValue">30% internal / 70% external</span>
+            </label>
+            <label>
+              Period
+              <input id="internalPeriod" type="month" value="2026-06">
+            </label>
+            <label>
+              Evidence
+              <textarea id="internalEvidence" rows="7" placeholder="Paste SLA breach notes, CSAT summary, invoice insight, audit finding, or delivery update" required></textarea>
+            </label>
+            <button class="primary-btn" type="submit">Save and recalculate</button>
+          </form>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Latest Internal Inputs</h3>
+              <span>Feeds PRISM after approval</span>
+            </div>
+            <div id="internalFeed" class="audit-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="audit" class="view" aria-labelledby="auditTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Defensible Decisions</p>
+            <h2 id="auditTitle">Signal audit trail and score history</h2>
+          </div>
+          <div class="action-row">
+            <button class="secondary-btn" id="downloadQuarterBtn" type="button">Download quarterly report</button>
+            <button class="secondary-btn" id="downloadFyBtn" type="button">Download FY report</button>
+            <button class="secondary-btn" id="downloadPortfolioBtn" type="button">Download portfolio summary</button>
+            <select id="qbrVendor" aria-label="QBR vendor"></select>
+            <span class="muted" id="qbrVendorStatus">Select vendor</span>
+            <button class="primary-btn" id="qbrBtn" type="button">Generate QBR snapshot</button>
+            <button class="secondary-btn" id="downloadQbrBtn" type="button">Download selected QBR</button>
+          </div>
+        </div>
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>Score History</h3>
+              <select id="historyVendor"></select>
+            </div>
+            <svg id="historyChart" class="history-chart" viewBox="0 0 720 260" role="img" aria-label="PRISM score history chart"></svg>
+            <div id="qbrSnapshotPanel" class="qbr-snapshot"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Audit Trail</h3>
+              <span id="auditCount"></span>
+            </div>
+            <div id="auditList" class="audit-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="connectors" class="view" aria-labelledby="connectorsTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Integration Shell</p>
+            <h2 id="connectorsTitle">Connector status and failed feeds</h2>
+          </div>
+          <button class="primary-btn" id="simulateFailureBtn" type="button">Simulate failure</button>
+        </div>
+        <div class="metric-grid" id="connectorMetrics"></div>
+        <div class="connector-grid" id="connectorGrid"></div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>Failed Feed Queue</h3>
+            <span>Retries and owner routing</span>
+          </div>
+          <div class="audit-list" id="failedFeedList"></div>
+        </section>
+      </section>
+
+      <section id="settings" class="view" aria-labelledby="settingsTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Admin Settings</p>
+            <h2 id="settingsTitle">Thresholds, schedules, and governance defaults</h2>
+          </div>
+          <button class="primary-btn" id="saveSettingsBtn" type="button">Save settings</button>
+        </div>
+        <div class="settings-grid">
+          <section class="panel settings-panel">
+            <div class="section-title">
+              <h3>Review Thresholds</h3>
+              <span>Demo policy</span>
+            </div>
+            <label>Fast-track confidence<input id="fastTrackConfidence" type="range" min="50" max="95" value="70"><span id="fastTrackValue">70%</span></label>
+            <label>Low-confidence rejection<input id="lowConfidenceThreshold" type="range" min="10" max="60" value="45"><span id="lowConfidenceValue">45%</span></label>
+            <label>Score drop alert<input id="scoreDropThreshold" type="range" min="1" max="20" value="8"><span id="scoreDropValue">0.8</span></label>
+          </section>
+          <section class="panel settings-panel">
+            <div class="section-title">
+              <h3>Signal Pull Policy</h3>
+              <span>Client-controlled cadence</span>
+            </div>
+            <label>
+              Auto-pull frequency
+              <select id="autoPullFrequency">
+                <option value="manual">Manual only</option>
+                <option value="15min">Every 15 minutes</option>
+                <option value="hourly">Hourly</option>
+                <option value="6h">Every 6 hours</option>
+                <option value="daily">Daily</option>
+              </select>
+            </label>
+            <label>
+              Signal quality rule
+              <select id="signalQualityPolicy">
+                <option value="strict">Strict: vendor-specific and 82%+ confidence</option>
+                <option value="balanced">Balanced: vendor-specific and 75%+ confidence</option>
+              </select>
+            </label>
+            <p class="settings-note">Auto-pull now creates only a small number of credible, directly vendor-linked signals per run.</p>
+          </section>
+          <section class="panel settings-panel">
+            <div class="section-title">
+              <h3>PRISM Governance</h3>
+              <span>Current policy</span>
+            </div>
+            <label class="toggle"><input id="humanGateRequired" type="checkbox" checked>Human approval required before score changes</label>
+            <label class="toggle"><input id="auditLocked" type="checkbox" checked>Lock approved audit events</label>
+            <label class="toggle"><input id="specialistApproval" type="checkbox" checked>Require Procurement Head approval for Specialist override</label>
+          </section>
+          <section class="panel settings-panel backend-panel">
+            <div class="section-title">
+              <h3>Backend Mode</h3>
+              <span id="backendModeStatus">Static demo</span>
+            </div>
+            <label class="toggle"><input id="backendModeToggle" type="checkbox">Use local Postgres backend</label>
+            <label>
+              Backend URL
+              <input id="backendBaseUrl" type="url" value="http://localhost:3001" placeholder="http://localhost:3001">
+            </label>
+            <div class="button-row">
+              <button class="secondary-btn" id="testBackendBtn" type="button">Test backend</button>
+            </div>
+            <p class="settings-note">Turn this on when your backend server is running. Netlify/static demo mode stays available when it is off.</p>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="section-title">
+            <h3>Demo Access Roles</h3>
+            <span id="currentRoleLabel"></span>
+          </div>
+          <div class="role-grid" id="roleGrid"></div>
+        </section>
+      </section>
+
+      <section id="monitoring" class="view" aria-labelledby="monitoringTitle">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">Production Operations</p>
+            <h2 id="monitoringTitle">Health, uploads, and AI explainability</h2>
+          </div>
+        </div>
+        <div class="metric-grid" id="monitoringMetrics"></div>
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="section-title">
+              <h3>AI Explanation Panel</h3>
+              <span>Pending signals</span>
+            </div>
+            <div class="audit-list" id="aiExplanationList"></div>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <h3>Data Upload History</h3>
+              <span>Internal gate activity</span>
+            </div>
+            <div class="audit-list" id="uploadHistoryList"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="modal-backdrop" id="actionModal" hidden>
+      <section class="action-modal" role="dialog" aria-modal="true" aria-labelledby="actionModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Procurement workspace</p>
+            <h2 id="actionModalTitle">Action details</h2>
+          </div>
+          <button class="icon-close" id="closeActionModal" type="button" aria-label="Close action details">×</button>
+        </div>
+        <div class="modal-content" id="actionModalContent"></div>
+      </section>
+    </div>
+    <script src="static-api.js?v=20260618-working-tool"></script>
+    <script src="app.js?v=20260618-working-tool"></script>
+  </body>
+</html>

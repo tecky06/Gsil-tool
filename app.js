@@ -679,7 +679,7 @@ async function signIn(event) {
   $("#loginError").textContent = "";
   setSession(user);
   hideLogin();
-  await refresh();
+  await refreshWithFallback();
   setActiveView(defaultViewForRole(user.role));
   startAutoPullLoop();
   toast(`Signed in as ${roleLabels[user.role]}`);
@@ -706,7 +706,7 @@ async function boot() {
   }
   state.currentUser = { name: session.name, role: session.role, email: session.username };
   hideLogin();
-  await refresh();
+  await refreshWithFallback();
   setActiveView(defaultViewForRole(session.role));
   startAutoPullLoop();
 }
@@ -1590,6 +1590,19 @@ async function refresh(nextState) {
   if (roleSwitcher && state.currentUser?.role) roleSwitcher.value = state.currentUser.role;
   renderSelects();
   renderAll();
+}
+
+async function refreshWithFallback() {
+  try {
+    await refresh();
+    return;
+  } catch (error) {
+    console.error("GSIL initial refresh failed", error);
+    if (!backendModeEnabled()) throw error;
+    localStorage.setItem(backendModeKey, "static");
+    await refresh();
+    toast("Backend could not load, so GSIL opened in built-in demo mode.");
+  }
 }
 
 async function action(label, fn) {

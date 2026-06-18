@@ -58,7 +58,11 @@ const api = {
 
 const backendModeKey = "gsil-backend-mode";
 const backendUrlKey = "gsil-backend-url";
-const defaultBackendUrl = "http://localhost:3001";
+const productionBackendUrl = "https://gsil-backend.onrender.com";
+const hostedFrontendHosts = ["tecky06.github.io", "gsil-tool.netlify.app"];
+const defaultBackendUrl = hostedFrontendHosts.includes(window.location.hostname)
+  ? productionBackendUrl
+  : "http://localhost:3001";
 
 const prismLabels = {
   P: "Performance",
@@ -109,7 +113,9 @@ const rolePermissions = {
 };
 
 function backendModeEnabled() {
-  return localStorage.getItem(backendModeKey) === "active";
+  const storedMode = localStorage.getItem(backendModeKey);
+  if (storedMode) return storedMode === "active";
+  return hostedFrontendHosts.includes(window.location.hostname);
 }
 
 function backendBaseUrl() {
@@ -127,12 +133,16 @@ function applyBackendUrlParams() {
   const backendUrlParam = params.get("backendUrl");
   if (backendUrlParam) {
     localStorage.setItem(backendUrlKey, backendUrlParam.replace(/\/+$/, ""));
+  } else if (hostedFrontendHosts.includes(window.location.hostname)) {
+    localStorage.setItem(backendUrlKey, productionBackendUrl);
   }
   if (backendParam === "1" || backendParam === "true") {
     localStorage.setItem(backendModeKey, "active");
   }
   if (backendParam === "0" || backendParam === "false") {
     localStorage.setItem(backendModeKey, "static");
+  } else if (!backendParam && hostedFrontendHosts.includes(window.location.hostname)) {
+    localStorage.setItem(backendModeKey, "active");
   }
 }
 

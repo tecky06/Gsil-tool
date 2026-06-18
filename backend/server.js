@@ -802,7 +802,19 @@ app.post("/api/vendors", async (req, res) => {
       [name, category, tier, schedule, specialist]
     );
 
-    res.status(201).json({ vendor: result.rows[0] });
+    await query(
+      `
+        insert into audit_events (actor_name, event_type, message, vendor_id, metadata)
+        values ($1, 'vendor_added', $2, $3, $4)
+      `,
+      [
+        actorFromRequest(req, "Vendor Creator"),
+        `${name} added as a ${tier} vendor.`,
+        result.rows[0].id,
+        JSON.stringify({ category, schedule, specialist })
+      ]
+    );
+    res.status(201).json({ vendor: result.rows[0], state: await statePayload() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

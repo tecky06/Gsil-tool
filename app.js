@@ -58,6 +58,7 @@ const api = {
 
 const backendModeKey = "gsil-backend-mode";
 const backendUrlKey = "gsil-backend-url";
+const pendingVendorDraftsKey = "gsil-pending-vendor-drafts";
 const productionBackendUrl = "https://gsil-backend.onrender.com";
 const hostedFrontendHosts = ["tecky06.github.io", "gsil-tool.netlify.app"];
 const defaultBackendUrl = hostedFrontendHosts.includes(window.location.hostname)
@@ -620,6 +621,38 @@ function currentSession() {
   } catch {
     return null;
   }
+}
+
+function pendingVendorDrafts() {
+  try {
+    return JSON.parse(localStorage.getItem(pendingVendorDraftsKey) || "[]").map(normalizeApiVendor);
+  } catch {
+    return [];
+  }
+}
+
+function savePendingVendorDraft(vendor) {
+  const drafts = [
+    vendor,
+    ...pendingVendorDrafts().filter((item) => item.id !== vendor.id && item.name.toLowerCase() !== vendor.name.toLowerCase())
+  ].slice(0, 20);
+  localStorage.setItem(pendingVendorDraftsKey, JSON.stringify(drafts));
+}
+
+function removePendingVendorDraft(localId, vendorName) {
+  const lowerName = String(vendorName || "").toLowerCase();
+  const drafts = pendingVendorDrafts().filter((item) => item.id !== localId && item.name.toLowerCase() !== lowerName);
+  localStorage.setItem(pendingVendorDraftsKey, JSON.stringify(drafts));
+}
+
+function mergePendingVendorDrafts(vendors = []) {
+  const liveVendors = vendors.map(normalizeApiVendor);
+  const liveNames = new Set(liveVendors.map((vendor) => vendor.name.toLowerCase()));
+  const drafts = pendingVendorDrafts().filter((draft) => !liveNames.has(draft.name.toLowerCase()));
+  return [
+    ...drafts,
+    ...liveVendors.filter((vendor) => !drafts.some((draft) => draft.id === vendor.id || draft.name.toLowerCase() === vendor.name.toLowerCase()))
+  ];
 }
 
 function can(permission) {
@@ -1602,6 +1635,7 @@ async function refresh(nextState) {
     const payload = await api.getState();
     state = { ...state, ...payload };
   }
+  state.vendors = mergePendingVendorDrafts(state.vendors);
   const roleSwitcher = $("#roleSwitcher");
   if (roleSwitcher && state.currentUser?.role) roleSwitcher.value = state.currentUser.role;
   renderSelects();
@@ -3553,6 +3587,7 @@ function bindGlobalEvents() {
     }
 
     const visibleDraft = createVisibleVendorDraft(vendor);
+    savePendingVendorDraft(visibleDraft);
     state.vendors = [
       visibleDraft,
       ...state.vendors.filter((item) => item.name.toLowerCase() !== visibleDraft.name.toLowerCase())
@@ -3567,6 +3602,10 @@ function bindGlobalEvents() {
     api.addVendor(vendor).then(async (result) => {
       if (result?.state) {
         state = { ...state, ...normalizeApiPayload(result.state) };
+        if (state.vendors.some((item) => item.name.toLowerCase() === vendor.name.toLowerCase() && item.id !== visibleDraft.id)) {
+          removePendingVendorDraft(visibleDraft.id, vendor.name);
+        }
+        state.vendors = mergePendingVendorDrafts(state.vendors);
         showAllVendorsBeforeRender();
         renderSelects();
         renderAll();
@@ -3575,6 +3614,7 @@ function bindGlobalEvents() {
         return;
       }
       if (result?.vendor) {
+        removePendingVendorDraft(visibleDraft.id, result.vendor.name);
         state.vendors = [
           result.vendor,
           ...state.vendors.filter((item) => item.id !== visibleDraft.id && item.id !== result.vendor.id)

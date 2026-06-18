@@ -11,6 +11,15 @@ const specialistPrismWeights = { P: 0.15, R: 0.1, I: 0.35, S: 0.15, M: 0.25 };
 app.use(cors());
 app.use(express.json());
 
+app.get("/api/render-health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "GSIL Backend",
+    mode: "render-startup",
+    time: new Date().toISOString()
+  });
+});
+
 function clampScore(value) {
   return Math.max(1, Math.min(10, Number(value)));
 }

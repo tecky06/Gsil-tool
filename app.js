@@ -1906,6 +1906,29 @@ function showAllVendorsBeforeRender() {
   });
 }
 
+function createVisibleVendorDraft(input) {
+  const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const dimensions = input.specialist
+    ? { P: 7, R: 7, I: 8, S: 7, M: 8 }
+    : { P: 7, R: 7, I: 7, S: 7, M: 7 };
+  const score = calculateVendorScore({ dimensions, specialist: input.specialist });
+  return normalizeApiVendor({
+    id,
+    name: input.name,
+    category: input.category,
+    tier: input.tier,
+    schedule: input.schedule,
+    specialist: input.specialist,
+    dimensions,
+    score,
+    history: [score],
+    status: score >= 7.8 ? "green" : score >= 6.6 ? "amber" : "red",
+    lastPull: "Newly added",
+    nextPull: input.schedule === "Manual" ? "Manual only" : input.schedule === "Weekly" ? "Next week 02:00" : "Tomorrow 02:00",
+    metadata: { syncStatus: "Pending backend sync" }
+  });
+}
+
 function renderVendorTable() {
   $("#vendorTable").innerHTML = state.vendors.map((vendor) => `
     <article class="table-row interactive-item" role="button" tabindex="0" data-open-vendor="${vendor.id}">
@@ -3524,27 +3547,52 @@ function bindGlobalEvents() {
       schedule: $("#vendorSchedule").value,
       specialist: $("#vendorSpecialist").checked
     };
-    action("New vendor added", () => api.addVendor(vendor)).then(async (result) => {
-      event.target.reset();
-      showAllVendorsBeforeRender();
+    if (!vendor.name || !vendor.category) {
+      toast("Vendor name and category are required");
+      return;
+    }
+
+    const visibleDraft = createVisibleVendorDraft(vendor);
+    state.vendors = [
+      visibleDraft,
+      ...state.vendors.filter((item) => item.name.toLowerCase() !== visibleDraft.name.toLowerCase())
+    ];
+    event.target.reset();
+    showAllVendorsBeforeRender();
+    renderSelects();
+    renderAll();
+    setActiveView("vendors");
+    toast(`${visibleDraft.name} added to the visible vendor list`);
+
+    api.addVendor(vendor).then(async (result) => {
       if (result?.state) {
-        renderVendorCards();
-        renderVendorTable();
+        state = { ...state, ...normalizeApiPayload(result.state) };
+        showAllVendorsBeforeRender();
+        renderSelects();
+        renderAll();
         setActiveView("vendors");
+        toast(`${vendor.name} synced with backend`);
         return;
       }
       if (result?.vendor) {
         state.vendors = [
           result.vendor,
-          ...state.vendors.filter((item) => item.id !== result.vendor.id)
+          ...state.vendors.filter((item) => item.id !== visibleDraft.id && item.id !== result.vendor.id)
         ];
         renderSelects();
         renderAll();
         setActiveView("vendors");
-        toast(`${result.vendor.name} is now visible in Vendors`);
+        toast(`${result.vendor.name} synced with backend`);
         return;
       }
       await refresh();
+    }).catch((error) => {
+      console.error("Vendor backend sync failed", error);
+      showAllVendorsBeforeRender();
+      renderSelects();
+      renderAll();
+      setActiveView("vendors");
+      toast(`${visibleDraft.name} is visible locally; backend sync will need retry.`);
     });
   });
   $("#sourceForm").addEventListener("submit", (event) => {

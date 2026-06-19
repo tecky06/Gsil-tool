@@ -942,9 +942,9 @@ function saveActionTasks(tasks) {
   localStorage.setItem("gsil-action-tasks", JSON.stringify(tasks.slice(0, 30)));
 }
 
-async function createActionTask({ title, vendorId, vendor, owner, stage = "To Review", due = "This week", action, source = "manual", metadata = {} }) {
+async function createActionTask({ title, vendorId, vendor, owner, stage = "To Review", due = "This week", action: actionText, source = "manual", metadata = {} }) {
   if (backendModeEnabled()) {
-    const result = await action("", () => api.addTask({ title, vendorId, vendor, owner, stage, due, action, source, metadata }));
+    const result = await action("", () => api.addTask({ title, vendorId, vendor, owner, stage, due, action: actionText, source, metadata }));
     return result.task;
   }
   const task = {
@@ -955,7 +955,7 @@ async function createActionTask({ title, vendorId, vendor, owner, stage = "To Re
     stage,
     owner: owner || "Procurement Owner",
     due,
-    action: action || title,
+    action: actionText || title,
     source,
     metadata,
     createdAt: new Date().toISOString()
@@ -1545,6 +1545,36 @@ async function handleModalAction(button) {
     toast("Source trust reduced");
     return;
   }
+  if (actionName === "sourceReview") {
+    const source = state.sources.find((item) => sameId(item.id, id));
+    if (!source) return;
+    await createActionTask({
+      title: `Source review: ${source.name}`,
+      vendor: "Source Governance",
+      owner: "Procurement Analyst",
+      stage: "To Review",
+      due: "This week",
+      action: `Review ${source.name} trust score ${sourceTrustScore(source)}, active status ${source.active ? "ON" : "OFF"}, and source category ${source.category}.`,
+      source: "source-review",
+      metadata: { sourceId: source.id, sourceName: source.name }
+    });
+    openActionModal(`Source review scheduled`, `
+      <div class="modal-section">
+        <h3>${escapeHtml(source.name)}</h3>
+        <p>Review task created for source governance.</p>
+      </div>
+      <div class="modal-kv-grid">
+        <div class="modal-kv"><span>Owner</span><strong>Procurement Analyst</strong></div>
+        <div class="modal-kv"><span>Due</span><strong>This week</strong></div>
+        <div class="modal-kv"><span>Trust</span><strong>${sourceTrustScore(source)}</strong></div>
+      </div>
+      <div class="modal-actions">
+        ${actionButton("openTasks", "source-review", "Open task board", "primary-btn")}
+      </div>
+    `);
+    toast("Source review task created");
+    return;
+  }
   if (actionName === "openMonitoring") {
     setActiveView("monitoring");
     closeActionModal();
@@ -1600,16 +1630,125 @@ async function handleModalAction(button) {
     toast("Vendor action brief downloaded");
     return;
   }
-  const actionLabels = {
-    compareAlternatives: "Alternative supplier comparison queued for roadmap demo",
-    validateSignal: "Signal evidence marked validated for demo review",
-    requestSignalClarification: "Signal clarification request routed to source owner",
-    inspectConnector: "Connector mapping inspection opened for demo review",
-    routeConnectorOwner: "Connector owner routing task created",
-    sourceReview: "Source review task added to governance queue",
-    copyAudit: "Audit note copied for stakeholder readout"
-  };
-  toast(actionLabels[actionName] || "Action captured");
+  if (actionName === "validateSignal") {
+    const signal = state.signals.find((item) => sameId(item.id, id));
+    if (!signal) return;
+    const vendor = vendorById(signal.vendorId);
+    await createActionTask({
+      title: `Validate signal: ${signal.title}`,
+      vendorId: signal.vendorId,
+      vendor: vendor?.name || "Vendor",
+      owner: signal.dimension === "R" ? "Risk Office" : signal.dimension === "S" ? "Finance Controller" : "Procurement Analyst",
+      stage: "To Review",
+      due: "Today",
+      action: `Validate source ${signal.source || signal.sourceName}, confidence ${signal.confidence}%, PRISM mapping ${prismLabels[signal.dimension]}, and impact ${signal.impact}/10 before approval.`,
+      source: "signal-validation",
+      metadata: { signalId: signal.id }
+    });
+    openSignalWorkspace(signal.id);
+    toast("Signal validation task created");
+    return;
+  }
+  if (actionName === "requestSignalClarification") {
+    const signal = state.signals.find((item) => sameId(item.id, id));
+    if (!signal) return;
+    const vendor = vendorById(signal.vendorId);
+    await createActionTask({
+      title: `Clarification needed: ${signal.title}`,
+      vendorId: signal.vendorId,
+      vendor: vendor?.name || "Vendor",
+      owner: "Source Owner",
+      stage: "Waiting For Evidence",
+      due: "This week",
+      action: `Request supporting evidence for ${signal.title}. Ask for source date, vendor/entity match, numeric support, and whether internal evidence is available.`,
+      source: "signal-clarification",
+      metadata: { signalId: signal.id }
+    });
+    openActionModal("Clarification request created", `
+      <div class="modal-section">
+        <h3>${escapeHtml(signal.title)}</h3>
+        <p>Clarification task routed to Source Owner.</p>
+      </div>
+      <div class="modal-kv-grid">
+        <div class="modal-kv"><span>Vendor</span><strong>${escapeHtml(vendor?.name || "Vendor")}</strong></div>
+        <div class="modal-kv"><span>Stage</span><strong>Waiting For Evidence</strong></div>
+        <div class="modal-kv"><span>Due</span><strong>This week</strong></div>
+      </div>
+      <div class="modal-actions">${actionButton("openTasks", "signal", "Open task board", "primary-btn")}</div>
+    `);
+    toast("Signal clarification task created");
+    return;
+  }
+  if (actionName === "inspectConnector") {
+    const connector = (state.connectors || []).find((item) => item.id === id);
+    if (!connector) return;
+    openActionModal(`${connector.name} mapping`, `
+      <div class="modal-section">
+        <h3>Mapped GSIL fields</h3>
+        <div class="modal-kv-grid">
+          <div class="modal-kv"><span>Vendor identity</span><strong>vendor_id, legal_name, owner</strong></div>
+          <div class="modal-kv"><span>Evidence</span><strong>metric, period, current, previous</strong></div>
+          <div class="modal-kv"><span>Governance</span><strong>source, trust, reviewer, timestamp</strong></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <h3>Production integration note</h3>
+        <p>${escapeHtml(connector.description || "Connector mapping will be finalized with read-only API access and approved field mapping.")}</p>
+      </div>
+      <div class="modal-actions">
+        ${actionButton("routeConnectorOwner", connector.id, "Create owner task", "primary-btn")}
+        ${actionButton("openMonitoring", connector.id, "Open monitoring")}
+      </div>
+    `);
+    toast("Connector mapping opened");
+    return;
+  }
+  if (actionName === "routeConnectorOwner") {
+    const connector = (state.connectors || []).find((item) => item.id === id);
+    if (!connector) return;
+    await createActionTask({
+      title: `Connector owner review: ${connector.name}`,
+      vendor: "Connector",
+      owner: connector.owner || "Data Governance",
+      stage: "Owner Assigned",
+      due: "This week",
+      action: `Confirm field mapping, auth method, data freshness SLA, and failure handling for ${connector.name}.`,
+      source: "connector-routing",
+      metadata: { connectorId: connector.id }
+    });
+    setActiveView("tasks");
+    closeActionModal();
+    toast("Connector owner task created");
+    return;
+  }
+  if (actionName === "copyAudit") {
+    const entry = state.audit.find((item) => sameId(item.id, id));
+    if (!entry) return;
+    const note = `${entry.message} | ${entry.actor || "GSIL"} | ${entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "Logged"}`;
+    await createActionTask({
+      title: "Audit note for stakeholder readout",
+      vendor: "Audit",
+      owner: "Procurement Analyst",
+      stage: "Ready For Approval",
+      due: "Today",
+      action: note,
+      source: "audit-note",
+      metadata: { auditId: entry.id }
+    });
+    openActionModal("Audit note prepared", `
+      <div class="modal-section">
+        <h3>Stakeholder readout note</h3>
+        <p>${escapeHtml(note)}</p>
+      </div>
+      <div class="modal-actions">
+        ${actionButton("openTasks", "audit", "Open task board", "primary-btn")}
+        ${actionButton("openAuditTrail", entry.id, "Open Audit Trail")}
+      </div>
+    `);
+    toast("Audit note task created");
+    return;
+  }
+  toast("Action captured");
 }
 
 function handleInteractiveOpen(target) {
@@ -3468,8 +3607,20 @@ function bindGlobalEvents() {
     $(selector).addEventListener("change", renderCompareMatrix);
   });
   on("#addDemoTaskBtn", "click", () => {
-    setActiveView("signals");
-    toast("Demo task flow starts from a signal or connector card");
+    const vendor = state.vendors.find((item) => item.status === "red") || state.vendors[0];
+    createActionTask({
+      title: `Demo review task: ${vendor?.name || "Portfolio"}`,
+      vendorId: vendor?.id || "",
+      vendor: vendor?.name || "Portfolio",
+      owner: "Procurement Analyst",
+      stage: "To Review",
+      due: "Today",
+      action: "Use this task to show how procurement work is routed from vendor intelligence into owner follow-up.",
+      source: "demo-task"
+    }).then(() => {
+      setActiveView("tasks");
+      toast("Demo task created");
+    });
   });
   on("#startDemoBtn", "click", () => {
     demoGuide = { active: true, step: 0 };
@@ -3572,7 +3723,20 @@ function bindGlobalEvents() {
     updateAutoPullStatus();
     toast($("#signalQualityPolicy").value === "strict" ? "Strict signal quality enabled" : "Balanced signal quality enabled");
   });
-  on("#simulateFailureBtn", "click", () => toast("Demo failure already visible in Failed Feed Queue"));
+  on("#simulateFailureBtn", "click", async () => {
+    await createActionTask({
+      title: "Connector failure simulation",
+      vendor: "Connector",
+      owner: "Data Governance",
+      stage: "Owner Assigned",
+      due: "Today",
+      action: "Simulated feed failure: validate source credentials, latest sync timestamp, retry policy and owner escalation.",
+      source: "monitoring-simulation",
+      metadata: { simulatedFailure: true }
+    });
+    setActiveView("tasks");
+    toast("Failure simulation task created");
+  });
   on("#runPullBtn", "click", async () => {
     if (!requireUiPermission("signal:pull", "Only Admin, Procurement Head, and Analyst can run signal pulls.")) return;
     const result = await action("", () => api.runPull());

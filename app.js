@@ -386,8 +386,8 @@ const roleWorkspaceConfig = {
   admin: {
     title: "Admin Control Tower",
     scope: "Owns policy, roles, connectors, and source governance",
-    primaryView: "settings",
-    primaryLabel: "Open settings",
+    primaryView: "dashboard",
+    primaryLabel: "Open dashboard",
     actions: ["Change auto-pull policy", "Tune scoring thresholds", "Manage source trust", "Sync connectors", "Approve any score action"],
     queue: ["Confirm production role map", "Review failed connector owners", "Lock source governance policy"]
   },
@@ -2445,6 +2445,8 @@ function applyPermissionState() {
     element.disabled = !can(permission);
     element.title = element.disabled ? title : "";
   });
+  const adminSettingsNav = $("#adminSettingsNav");
+  if (adminSettingsNav) adminSettingsNav.hidden = state.currentUser?.role !== "admin";
 }
 
 function renderMonitoring() {
@@ -3471,7 +3473,7 @@ function renderAll() {
 }
 
 function bindNavigation() {
-  $$(".nav-item").forEach((button) => {
+  $$(".nav-item, #adminSettingsNav").forEach((button) => {
     button.addEventListener("click", () => {
       setActiveView(button.dataset.view);
     });

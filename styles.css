@@ -230,11 +230,30 @@ textarea:disabled {
 .sidebar-footer {
   margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   padding: 14px 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
+}
+
+.admin-settings-link {
+  flex: 0 0 100%;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: transparent;
+  color: #d9e5e9;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.admin-settings-link:hover {
+  background: var(--nav-soft);
+  color: #ffffff;
 }
 
 .auto-pull-toggle {

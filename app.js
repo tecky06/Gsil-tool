@@ -60,6 +60,7 @@ const backendModeKey = "gsil-backend-mode";
 const backendUrlKey = "gsil-backend-url";
 const pendingVendorDraftsKey = "gsil-pending-vendor-drafts";
 const clientVendorOverlayKey = "gsil-client-visible-vendors";
+const presentationModeKey = "gsil-presentation-mode";
 const productionBackendUrl = "https://gsil-backend.onrender.com";
 const hostedFrontendHosts = ["tecky06.github.io", "gsil-tool.netlify.app"];
 const defaultBackendUrl = hostedFrontendHosts.includes(window.location.hostname)
@@ -84,9 +85,9 @@ const statusTerms = {
 };
 
 const connectorTerms = {
-  healthy: "Operational Ready",
-  degraded: "Data Watch",
-  failed: "Owner Escalation",
+  healthy: "Connected",
+  degraded: "Attention Needed",
+  failed: "Attention Needed",
   paused: "Paused"
 };
 
@@ -663,6 +664,7 @@ function mergePendingVendorDrafts(vendors = []) {
 
 async function resetDemoState() {
   if (!requireUiPermission("settings:write", "Only Admin can reset the demo state.")) return;
+  if (!window.confirm("Reset local demo vendors, tasks, decisions, and cached demo activity? Backend records will not be deleted.")) return;
   [
     pendingVendorDraftsKey,
     clientVendorOverlayKey,
@@ -675,7 +677,33 @@ async function resetDemoState() {
   showAllVendorsBeforeRender();
   await refreshWithFallback();
   setActiveView("dashboard");
+  showOperationStatus("Demo state reset", "success", true);
   toast("Demo state reset");
+}
+
+function presentationModeEnabled() {
+  return localStorage.getItem(presentationModeKey) === "active";
+}
+
+function applyPresentationMode() {
+  const enabled = presentationModeEnabled();
+  document.body.classList.toggle("presentation-mode", enabled);
+  const button = $("#presentationModeBtn");
+  if (button) {
+    button.hidden = state.currentUser?.role !== "admin";
+    button.textContent = enabled ? "Exit presentation" : "Presentation mode";
+    button.classList.toggle("active", enabled);
+  }
+}
+
+function togglePresentationMode() {
+  if (!requireUiPermission("settings:write", "Only Admin can change presentation mode.")) return;
+  const enabling = !presentationModeEnabled();
+  localStorage.setItem(presentationModeKey, enabling ? "active" : "inactive");
+  if (enabling) setActiveView("dashboard");
+  applyPresentationMode();
+  applyPermissionState();
+  toast(presentationModeEnabled() ? "Presentation mode enabled" : "Presentation mode disabled");
 }
 
 function can(permission) {
@@ -822,6 +850,14 @@ function statusLabel(status) {
 
 function connectorLabel(status) {
   return connectorTerms[status] || String(status || "Unknown");
+}
+
+function clientFacingText(value, fallback = "Not available") {
+  return String(value || fallback)
+    .replace(/demo ready/gi, "Ready for sync")
+    .replace(/demo sync/gi, "sync")
+    .replace(/static demo/gi, "local continuity mode")
+    .replace(/integration shell/gi, "integration");
 }
 
 function sourceTrustScore(source) {
@@ -1047,6 +1083,20 @@ function toast(message) {
   toastEl.classList.add("show");
   window.clearTimeout(toastEl._timer);
   toastEl._timer = window.setTimeout(() => toastEl.classList.remove("show"), 2800);
+}
+
+function showOperationStatus(message, type = "working", autoHide = false) {
+  const status = $("#operationStatus");
+  if (!status) return;
+  status.hidden = false;
+  status.className = `operation-status ${type}`;
+  status.textContent = message;
+  window.clearTimeout(status._timer);
+  if (autoHide) {
+    status._timer = window.setTimeout(() => {
+      status.hidden = true;
+    }, 3600);
+  }
 }
 
 function autoPullEnabled() {
@@ -1382,7 +1432,7 @@ function openConnectorWorkspace(connectorId) {
       ${connector.lastError ? `<p class="error-note">${escapeHtml(connector.lastError)}</p>` : ""}
     </div>
     <div class="modal-actions">
-      ${connector.demoIntegration ? actionButton("syncConnector", connector.id, "Sync demo data", "primary-btn") : ""}
+      ${connector.demoIntegration ? actionButton("syncConnector", connector.id, "Run sync", "primary-btn") : ""}
       ${actionButton("inspectConnector", connector.id, "Inspect mapping")}
       ${actionButton("routeConnectorOwner", connector.id, "Route to owner")}
       ${actionButton("openMonitoring", connector.id, "Open monitoring")}
@@ -1524,6 +1574,7 @@ async function handleModalAction(button) {
   if (actionName === "toggleSource") {
     if (!requireUiPermission("source:write", "Only Admin and Analyst can change source trust controls.")) return;
     const source = state.sources.find((item) => sameId(item.id, id));
+    if (source?.active && !window.confirm(`Pause ${source.name}? It will stop contributing new signals until reactivated.`)) return;
     if (source) await action("", () => api.updateSource(source.id, { active: !source.active }));
     closeActionModal();
     toast("Source status updated");
@@ -1540,6 +1591,7 @@ async function handleModalAction(button) {
   if (actionName === "sourceDecreaseTrust") {
     if (!requireUiPermission("source:write", "Only Admin and Analyst can change source trust controls.")) return;
     const source = state.sources.find((item) => sameId(item.id, id));
+    if (source && !window.confirm(`Reduce trust for ${source.name} from ${sourceTrustScore(source)}?`)) return;
     if (source) await action("", () => api.updateSource(id, { confidence: nextLowerConfidence(source.confidence), trustScore: Math.max(20, sourceTrustScore(source) - 10) }));
     closeActionModal();
     toast("Source trust reduced");
@@ -1753,7 +1805,7 @@ async function handleModalAction(button) {
 
 function handleInteractiveOpen(target) {
   const interactive = target.closest(".interactive-item");
-  if (!interactive || target.closest("button,input,select,textarea,[contenteditable='true']")) return;
+  if (!interactive || target.closest("button,input,select,textarea,summary,details,[contenteditable='true']")) return;
   if (interactive.dataset.openPortfolio) openPortfolioWorkspace(interactive.dataset.openPortfolio);
   if (interactive.dataset.openVendor) openVendorWorkspace(interactive.dataset.openVendor);
   if (interactive.dataset.openSignal) openSignalWorkspace(interactive.dataset.openSignal);
@@ -1788,6 +1840,7 @@ function openNotificationCenter() {
 
 function setBusy(isBusy) {
   document.body.classList.toggle("busy", isBusy);
+  if (isBusy) showOperationStatus("Working…", "working");
 }
 
 async function refresh(nextState) {
@@ -1822,14 +1875,18 @@ async function action(label, fn) {
     setBusy(true);
     const result = await fn();
     if (result?.state) await refresh(result.state);
+    const successMessage = label || "Action completed successfully";
+    showOperationStatus(successMessage, "success", true);
+    toast(successMessage);
     return result;
   } catch (error) {
     console.error("GSIL action failed", error);
-    toast(error.message || "Something went wrong");
+    const errorMessage = error.message || "The action could not be completed";
+    showOperationStatus(errorMessage, "error", true);
+    toast(errorMessage);
     throw error;
   } finally {
     setBusy(false);
-    if (label) toast(label);
   }
 }
 
@@ -1930,8 +1987,8 @@ function renderPortfolio() {
   `;
   $("#portfolioActions").innerHTML = `
     <button class="secondary-btn" data-portfolio-nav="signals" type="button">Open Approval Gate</button>
-    <button class="secondary-btn" data-portfolio-nav="tasks" type="button">Open Task Board</button>
-    <button class="secondary-btn" data-portfolio-nav="compare" type="button">Compare Vendors</button>
+    <button class="secondary-btn" data-portfolio-nav="vendors" type="button">Open Vendors</button>
+    <button class="secondary-btn" data-portfolio-nav="monitoring" type="button">Open Monitoring</button>
   `;
   const lastRun = state.meta?.lastSchedulerRun ? new Date(state.meta.lastSchedulerRun).toLocaleString() : "Live";
   $("#portfolioUpdated").textContent = lastRun;
@@ -2152,6 +2209,11 @@ function renderVendorTable() {
       if (!requireUiPermission("vendor:write", "Only Admin and Procurement Head can change vendor setup.")) return;
       const vendor = vendorById(checkbox.dataset.specialist);
       const previous = vendor?.specialist;
+      const verb = checkbox.checked ? "enable" : "remove";
+      if (!window.confirm(`${verb[0].toUpperCase() + verb.slice(1)} specialist weighting for ${vendor?.name || "this vendor"}?`)) {
+        checkbox.checked = Boolean(previous);
+        return;
+      }
       if (vendor) vendor.specialist = checkbox.checked;
       try {
         await action("Specialist override updated and saved", () => api.updateVendor(checkbox.dataset.specialist, { specialist: checkbox.checked }));
@@ -2247,27 +2309,37 @@ function renderSignals() {
         <div class="signal-top">
           <div>
             <h4>${signal.title}</h4>
-            <span class="muted">${vendor?.name || "Vendor"} · ${signal.source} · ${signal.type} · ${signal.sentiment}</span>
+            <span class="muted">${vendor?.name || "Vendor"} · ${signal.source}</span>
           </div>
-          <span class="badge ${confClass}">${signal.confidence}%</span>
+          <span class="badge ${confClass}">${signal.confidence}% confidence</span>
         </div>
-        <p contenteditable="${can("signal:approve") ? "true" : "false"}" data-summary="${signal.id}">${signal.summary}</p>
-        <div class="signal-controls">
-          <label>
-            Impact: <strong data-impact-value="${signal.id}">${signal.impact}/10</strong>
-            <input type="range" min="1" max="10" value="${signal.impact}" data-impact="${signal.id}" ${disabledIfNo("signal:approve")}>
-          </label>
-          <label>
-            Dimension
-            <select data-dimension="${signal.id}" ${disabledIfNo("signal:approve")}>
-              ${Object.keys(prismLabels).map((key) => `<option value="${key}" ${key === signal.dimension ? "selected" : ""}>${key} - ${prismLabels[key]}</option>`).join("")}
-            </select>
-          </label>
-          <div class="signal-actions">
-            <button class="primary-btn" data-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Approve</button>
-            <button class="secondary-btn" data-edit-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Edit & approve</button>
-            <button class="secondary-btn" data-reject="${signal.id}" type="button" ${disabledIfNo("signal:reject")}>Reject</button>
+        <div class="signal-decision-row">
+          <span>${signal.type}</span>
+          <span>${signal.sentiment}</span>
+          <span>${prismLabels[signal.dimension]}</span>
+          <strong>Impact ${signal.impact}/10</strong>
+        </div>
+        <p class="signal-summary" contenteditable="${can("signal:approve") ? "true" : "false"}" data-summary="${signal.id}">${signal.summary}</p>
+        <details class="signal-evidence">
+          <summary>View evidence and impact</summary>
+          <p>${escapeHtml(signal.aiExplanation || `Mapped to ${prismLabels[signal.dimension]} using vendor relevance, source trust, and numeric evidence.`)}</p>
+          <div class="signal-controls">
+            <label>
+              Impact: <strong data-impact-value="${signal.id}">${signal.impact}/10</strong>
+              <input type="range" min="1" max="10" value="${signal.impact}" data-impact="${signal.id}" ${disabledIfNo("signal:approve")}>
+            </label>
+            <label>
+              PRISM dimension
+              <select data-dimension="${signal.id}" ${disabledIfNo("signal:approve")}>
+                ${Object.keys(prismLabels).map((key) => `<option value="${key}" ${key === signal.dimension ? "selected" : ""}>${key} - ${prismLabels[key]}</option>`).join("")}
+              </select>
+            </label>
           </div>
+        </details>
+        <div class="signal-actions">
+          <button class="primary-btn" data-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Approve</button>
+          <button class="secondary-btn" data-edit-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Edit & approve</button>
+          <button class="secondary-btn" data-reject="${signal.id}" type="button" ${disabledIfNo("signal:reject")}>Reject</button>
         </div>
       </article>
     `;
@@ -2307,28 +2379,53 @@ function bindSignalEvents() {
   $$("[data-reject]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!requireUiPermission("signal:reject", "This role cannot reject signals in the demo gate.")) return;
+      if (!window.confirm("Reject this signal? It will be removed from the pending Approval Gate.")) return;
       const reason = "Reviewer rejected signal during gate review.";
       action("Signal rejected", () => api.rejectSignal(button.dataset.reject, reason));
     });
   });
 }
 
+function sourceGroup(source) {
+  if (source.category === "Internal System") return "Internal sources";
+  if (source.category === "Regulatory") return "Regulatory sources";
+  return "External intelligence";
+}
+
+function sourceTrustRationale(source) {
+  if (source.notes) return source.notes;
+  if (source.category === "Internal System") return "First-party operational evidence with controlled ownership and traceability.";
+  if (source.category === "Regulatory") return "Authoritative context used only when entity match and reporting period are confirmed.";
+  return "External context accepted only after vendor match, recency, numeric evidence, and confidence checks.";
+}
+
+function sourceReviewDate(source) {
+  const value = source.updated_at || source.updatedAt || source.created_at || source.createdAt;
+  return value ? new Date(value).toLocaleDateString() : "Scheduled";
+}
+
 function renderSources() {
-  $("#sourceList").innerHTML = state.sources.map((source) => `
+  const groups = ["Internal sources", "External intelligence", "Regulatory sources"];
+  $("#sourceList").innerHTML = groups.map((group) => {
+    const sources = state.sources.filter((source) => sourceGroup(source) === group);
+    if (!sources.length) return "";
+    return `<section class="source-group"><div class="source-group-heading"><h3>${group}</h3><span>${sources.length} configured</span></div>${sources.map((source) => `
     <article class="source-card interactive-item" role="button" tabindex="0" data-open-source="${source.id}">
       <div>
         <h4>${source.name}</h4>
-        <span class="muted">${source.url}</span>
+        <span class="muted">${sourceTrustRationale(source)}</span>
       </div>
-      <span>${source.category}</span>
+      <span>${source.category}<small>Reviewed: ${sourceReviewDate(source)}</small></span>
       <span class="badge ${source.confidence === "High" ? "green" : source.confidence === "Medium" ? "amber" : "red"}">Trust ${sourceTrustScore(source)}</span>
-      <button class="switch-btn ${source.active ? "on" : ""}" data-source-toggle="${source.id}" type="button" ${disabledIfNo("source:write")}>${source.active ? "ON" : "OFF"}</button>
+      <button class="switch-btn ${source.active ? "on" : ""}" data-source-toggle="${source.id}" type="button" ${disabledIfNo("source:write")}>${source.active ? "Active" : "Paused"}</button>
     </article>
-  `).join("");
+  `).join("")}</section>`;
+  }).join("");
   $$("[data-source-toggle]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!requireUiPermission("source:write", "Only Admin and Analyst can change source trust controls.")) return;
       const source = state.sources.find((item) => sameId(item.id, button.dataset.sourceToggle));
+      if (source?.active && !window.confirm(`Pause ${source.name}? It will stop contributing new signals until reactivated.`)) return;
       action("Source library updated", () => api.updateSource(source.id, { active: !source.active }));
     });
   });
@@ -2354,35 +2451,39 @@ function renderAudit() {
 }
 
 function renderConnectors() {
-  const connectors = state.connectors || [];
+  const allConnectors = state.connectors || [];
+  const coreConnectors = [
+    allConnectors.find((connector) => String(connector.id).toLowerCase() === "coupa") || allConnectors.find((connector) => /coupa/i.test(connector.name)),
+    allConnectors.find((connector) => String(connector.id).toLowerCase() === "littlebig") || allConnectors.find((connector) => /littlebig/i.test(connector.name)),
+    allConnectors.find((connector) => String(connector.id).toLowerCase() === "vendor-master") || allConnectors.find((connector) => /vendor master/i.test(connector.name))
+  ].filter(Boolean);
+  const connectors = coreConnectors.length ? coreConnectors : allConnectors.slice(0, 3);
   const healthy = connectors.filter((connector) => connector.status === "healthy").length;
-  const failed = connectors.filter((connector) => connector.status === "failed").length;
-  const degraded = connectors.filter((connector) => connector.status === "degraded").length;
+  const attention = connectors.filter((connector) => connector.status === "failed" || connector.status === "degraded").length;
   const paused = connectors.filter((connector) => connector.status === "paused").length;
   $("#connectorMetrics").innerHTML = [
-    ["Operational Ready", healthy, "Feeds running normally"],
-    ["Data Watch", degraded, "Needs review"],
-    ["Owner Escalation", failed, "Action required"],
-    ["Paused", paused, "Disabled by admin"]
+    ["Connected", healthy, "Feeds available"],
+    ["Attention Needed", attention, "Owner review required"],
+    ["Paused", paused, "Temporarily inactive"]
   ].map(([label, value, note]) => `<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
   $("#connectorGrid").innerHTML = connectors.map((connector) => `
     <article class="connector-card interactive-item" role="button" tabindex="0" data-open-connector="${connector.id}">
       <div class="card-top">
         <div>
           <h4>${connector.name}</h4>
-          <span class="muted">${connector.type} · ${connector.category}</span>
+          <span class="muted">${connector.category === "Internal System" ? "Enterprise Data" : clientFacingText(connector.type)} · ${connector.category}</span>
         </div>
         <span class="badge ${statusClass(connector.status)}">${connectorLabel(connector.status)}</span>
       </div>
       <div class="connector-meta">
         <span>Owner: ${connector.owner}</span>
-        <span>Trust score: ${connectorTrustScore(connector)}</span>
-        <span>Last sync: ${connector.lastSync}</span>
-        <span>Next: ${connector.nextSync}</span>
+        <span>Last successful sync: ${clientFacingText(connector.lastSync, "Not yet synced")}</span>
+        <span>Data freshness: ${connector.lastSync ? "Within configured window" : "Awaiting first sync"}</span>
+        <span>Next action: ${connector.status === "healthy" ? "Continue scheduled monitoring" : connector.status === "paused" ? "Confirm reactivation owner" : "Review issue and retry"}</span>
       </div>
-      ${connector.description ? `<p class="muted connector-description">${connector.description}</p>` : ""}
+      ${connector.description ? `<p class="muted connector-description">${escapeHtml(clientFacingText(connector.description))}</p>` : ""}
       ${connector.lastError ? `<p class="error-note">${connector.lastError}</p>` : ""}
-      ${connector.demoIntegration ? `<button class="secondary-btn connector-sync" data-sync-connector="${connector.id}" type="button" ${disabledIfNo("connector:sync")}>Sync demo data</button>` : ""}
+      ${connector.demoIntegration ? `<button class="secondary-btn connector-sync" data-sync-connector="${connector.id}" type="button" ${disabledIfNo("connector:sync")}>Run sync</button>` : ""}
     </article>
   `).join("");
   $("#failedFeedList").innerHTML = (state.failedFeeds || []).map((feed) => `
@@ -2391,6 +2492,8 @@ function renderConnectors() {
       <p>${feed.error || "No error detail"} Owner: ${feed.owner}. Next retry: ${feed.nextRetry || "Not scheduled"}.</p>
     </article>
   `).join("") || `<article class="audit-item"><strong>No failed feeds</strong><p>All configured feeds are currently healthy or paused.</p></article>`;
+  const testButton = $("#simulateFailureBtn");
+  if (testButton) testButton.textContent = (state.failedFeeds || []).some((feed) => feed.testAlert) ? "Clear test alert" : "Test monitoring alert";
   $$("[data-sync-connector]").forEach((button) => {
     button.addEventListener("click", async () => {
       if (!requireUiPermission("connector:sync", "Only Admin and Procurement Head can sync connector demo data.")) return;
@@ -2435,6 +2538,7 @@ function applyPermissionState() {
     ["#sourceForm button[type='submit']", "source:write", "Only Admin and Analyst can add sources."],
     ["#internalForm button[type='submit']", "internal:write", "Only Admin, Analyst, and Finance Controller can add internal evidence."],
     ["#qbrBtn", "qbr:write", "This role cannot generate QBR snapshots."],
+    ["#simulateFailureBtn", "connector:sync", "Only Admin and Procurement Head can test connector monitoring."],
     ["#autoPullToggle", "settings:write", "Only Admin can pause or resume auto-pull."],
     ["#resetDemoBtn", "settings:write", "Only Admin can reset the demo state."],
     ["#resetDemoSettingsBtn", "settings:write", "Only Admin can reset the demo state."]
@@ -2446,29 +2550,37 @@ function applyPermissionState() {
     element.title = element.disabled ? title : "";
   });
   const adminSettingsNav = $("#adminSettingsNav");
-  if (adminSettingsNav) adminSettingsNav.hidden = state.currentUser?.role !== "admin";
+  if (adminSettingsNav) adminSettingsNav.hidden = state.currentUser?.role !== "admin" || presentationModeEnabled();
+  applyPresentationMode();
 }
 
 function renderMonitoring() {
   const monitoring = state.monitoring || {};
   $("#monitoringMetrics").innerHTML = [
-    ["API", connectorLabel(monitoring.apiStatus) || "unknown", "Health endpoint available"],
-    ["Scheduler", monitoring.schedulerStatus === "active" ? "Operational Ready" : "Not started", "Signal pull status"],
+    ["Data Service", connectorLabel(monitoring.apiStatus) || "Unknown", "Application data availability"],
+    ["Signal Refresh", monitoring.schedulerStatus === "active" ? "Active" : "Manual", "Current refresh mode"],
     ["Pending Reviews", monitoring.pendingReviews || 0, "Human gate workload"],
-    ["Failed Connectors", monitoring.failedConnectors || 0, "Needs owner action"]
+    ["Connector Issues", monitoring.failedConnectors || 0, "Needs owner action"]
   ].map(([label, value, note]) => `<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
-  $("#aiExplanationList").innerHTML = state.signals.slice(0, 8).map((signal) => `
-    <article class="audit-item interactive-item" role="button" tabindex="0" data-open-signal="${signal.id}">
-      <strong>${signal.title} · ${signal.confidence}% · ${signal.dimension}</strong>
-      <p>${signal.aiExplanation || `Mapped from ${signal.source} using source confidence, sentiment cues, and PRISM keyword matching.`}</p>
+  $("#aiExplanationList").innerHTML = (state.connectors || []).slice(0, 6).map((connector) => `
+    <article class="audit-item interactive-item" role="button" tabindex="0" data-open-connector="${connector.id}">
+      <strong>${connector.name} · ${connectorLabel(connector.status)}</strong>
+      <p>Freshness: ${clientFacingText(connector.lastSync, "Awaiting first sync")}. Owner: ${connector.owner || "Data Governance"}. ${connector.lastError ? `Issue: ${escapeHtml(connector.lastError)}` : "Next action: continue scheduled monitoring."}</p>
     </article>
-  `).join("") || `<article class="audit-item"><strong>No pending AI explanations</strong><p>Run auto-pull or ingest a signal to populate this panel.</p></article>`;
-  $("#uploadHistoryList").innerHTML = (state.uploadHistory || []).map((upload) => `
+  `).join("") || `<article class="audit-item"><strong>No connectors configured</strong><p>Connect Coupa, LittleBig, or Vendor Master to begin monitoring.</p></article>`;
+  const uploadActivity = (state.uploadHistory || []).map((upload) => `
     <article class="audit-item interactive-item" role="button" tabindex="0" data-open-vendor="${state.vendors.find((vendor) => vendor.name === upload.vendor)?.id || ""}">
       <strong>${upload.vendor} · ${upload.feedType} · ${upload.status}</strong>
       <p>${upload.period} · ${prismLabels[upload.dimension] || upload.dimension} · ${upload.weight}% weight · ${upload.evidence}</p>
     </article>
-  `).join("") || `<article class="audit-item"><strong>No uploads yet</strong><p>Internal gate submissions will appear here.</p></article>`;
+  `);
+  const auditActivity = state.audit.slice(0, 6).map((entry) => `
+    <article class="audit-item interactive-item" role="button" tabindex="0" data-open-audit="${entry.id}">
+      <strong>${escapeHtml(entry.message)}</strong>
+      <p>${escapeHtml(entry.actor || "GSIL")} · ${entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "Logged"}</p>
+    </article>
+  `);
+  $("#uploadHistoryList").innerHTML = [...uploadActivity, ...auditActivity].slice(0, 8).join("") || `<article class="audit-item"><strong>No recent activity</strong><p>Internal evidence and approved signal activity will appear here.</p></article>`;
 }
 
 function renderRiskHeatmap() {
@@ -3539,6 +3651,7 @@ function bindGlobalEvents() {
     if (event.target.id === "actionModal") closeActionModal();
   });
   on("#loginForm", "submit", signIn);
+  on("#presentationModeBtn", "click", togglePresentationMode);
   on("#logoutBtn", "click", signOut);
   $("#globalSearch").addEventListener("input", () => {
     renderVendorCards();
@@ -3725,19 +3838,47 @@ function bindGlobalEvents() {
     updateAutoPullStatus();
     toast($("#signalQualityPolicy").value === "strict" ? "Strict signal quality enabled" : "Balanced signal quality enabled");
   });
-  on("#simulateFailureBtn", "click", async () => {
-    await createActionTask({
-      title: "Connector failure simulation",
-      vendor: "Connector",
-      owner: "Data Governance",
-      stage: "Owner Assigned",
-      due: "Today",
-      action: "Simulated feed failure: validate source credentials, latest sync timestamp, retry policy and owner escalation.",
-      source: "monitoring-simulation",
-      metadata: { simulatedFailure: true }
-    });
-    setActiveView("tasks");
-    toast("Failure simulation task created");
+  on("#simulateFailureBtn", "click", () => {
+    if (!requireUiPermission("connector:sync", "Only Admin and Procurement Head can test connector monitoring.")) return;
+    const existingTestAlert = (state.failedFeeds || []).find((feed) => feed.testAlert);
+    if (existingTestAlert) {
+      state.failedFeeds = state.failedFeeds.filter((feed) => !feed.testAlert);
+      state.connectors = (state.connectors || []).map((item) => item.id === existingTestAlert.id
+        ? { ...item, status: "healthy", lastError: "", nextRetry: "" }
+        : item);
+      state.monitoring = { ...(state.monitoring || {}), failedConnectors: state.failedFeeds.length };
+      renderConnectors();
+      renderMonitoring();
+      showOperationStatus("Test monitoring alert cleared", "success", true);
+      toast("Test monitoring alert cleared");
+      return;
+    }
+    const connector = (state.connectors || []).find((item) => item.id === "coupa") || state.connectors?.[0];
+    if (!connector) {
+      toast("No connector is available for the monitoring test");
+      return;
+    }
+    const alert = {
+      id: connector.id,
+      name: connector.name,
+      owner: connector.owner || "Data Governance",
+      status: "degraded",
+      error: "Test alert: connector response exceeded the monitoring threshold. No real integration was interrupted.",
+      nextRetry: "Demo retry in 5 minutes",
+      testAlert: true
+    };
+    state.connectors = state.connectors.map((item) => item.id === connector.id
+      ? { ...item, status: "degraded", lastError: alert.error, nextRetry: alert.nextRetry }
+      : item);
+    state.failedFeeds = [alert, ...(state.failedFeeds || []).filter((feed) => !feed.testAlert && feed.id !== connector.id)];
+    state.monitoring = {
+      ...(state.monitoring || {}),
+      failedConnectors: state.failedFeeds.length
+    };
+    renderConnectors();
+    renderMonitoring();
+    showOperationStatus("Test monitoring alert added to Failed Feed Queue", "success", true);
+    toast("Test monitoring alert added to Failed Feed Queue");
   });
   on("#runPullBtn", "click", async () => {
     if (!requireUiPermission("signal:pull", "Only Admin, Procurement Head, and Analyst can run signal pulls.")) return;
@@ -3762,6 +3903,7 @@ function bindGlobalEvents() {
   });
   $("#bulkRejectBtn").addEventListener("click", () => {
     if (!requireUiPermission("signal:bulk", "Only Admin and Procurement Head can bulk reject signals.")) return;
+    if (!window.confirm("Reject all low-confidence pending signals?")) return;
     action("Low confidence signals rejected", () => api.bulkSignals("reject-low"));
   });
   $("#vendorForm").addEventListener("submit", (event) => {
@@ -3790,6 +3932,7 @@ function bindGlobalEvents() {
     renderSelects();
     renderAll();
     setActiveView("vendors");
+    showOperationStatus(`${visibleDraft.name} saved locally; syncing with backend…`, "working");
     toast(`${visibleDraft.name} added to the visible vendor list`);
 
     api.addVendor(vendor).then(async (result) => {
@@ -3800,6 +3943,7 @@ function bindGlobalEvents() {
         renderSelects();
         renderAll();
         setActiveView("vendors");
+        showOperationStatus(`${vendor.name} saved and synced`, "success", true);
         toast(`${vendor.name} synced with backend`);
         return;
       }
@@ -3811,6 +3955,7 @@ function bindGlobalEvents() {
         renderSelects();
         renderAll();
         setActiveView("vendors");
+        showOperationStatus(`${result.vendor.name} saved and synced`, "success", true);
         toast(`${result.vendor.name} synced with backend`);
         return;
       }
@@ -3821,6 +3966,7 @@ function bindGlobalEvents() {
       renderSelects();
       renderAll();
       setActiveView("vendors");
+      showOperationStatus(`${visibleDraft.name} is saved locally; backend sync needs retry`, "error", true);
       toast(`${visibleDraft.name} is visible locally; backend sync will need retry.`);
     });
   });

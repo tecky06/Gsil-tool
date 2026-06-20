@@ -94,24 +94,26 @@
             <option value="viewer">Viewer</option>
           </select>
         </label>
+        <button class="secondary-btn" id="presentationModeBtn" type="button">Presentation mode</button>
         <button class="secondary-btn" id="logoutBtn" type="button">Sign out</button>
       </header>
+      <div class="operation-status" id="operationStatus" role="status" aria-live="polite" hidden></div>
 
       <section id="dashboard" class="view active" aria-labelledby="dashboardTitle">
         <div class="view-heading">
           <div>
             <p class="eyebrow">Executive View</p>
-            <h2 id="dashboardTitle">Monday morning vendor truth</h2>
+            <h2 id="dashboardTitle">Vendor portfolio overview</h2>
           </div>
           <div class="action-row">
-            <button class="secondary-btn" id="startDemoBtn" type="button">Start guided demo</button>
-            <button class="primary-btn" id="runPullBtn" type="button">Run credible pull now</button>
+            <button class="secondary-btn client-focus-hidden" id="startDemoBtn" type="button">Start guided demo</button>
+            <button class="primary-btn" id="runPullBtn" type="button">Refresh credible signals</button>
           </div>
         </div>
 
         <div class="metric-grid" id="metricGrid"></div>
 
-        <section class="panel client-brief">
+        <section class="panel client-brief client-focus-hidden">
           <div class="section-title">
             <h3>Client Confidence Brief</h3>
             <span>Why this matters</span>
@@ -119,7 +121,7 @@
           <div id="clientBrief" class="client-brief-grid"></div>
         </section>
 
-        <section class="panel demo-guide" id="demoGuide" hidden>
+        <section class="panel demo-guide client-focus-hidden" id="demoGuide" hidden>
           <div class="section-title">
             <h3>Guided Demo Mode</h3>
             <span id="demoStepCount">Step 1 of 5</span>
@@ -165,7 +167,7 @@
           <div class="action-cockpit" id="actionCockpit"></div>
         </section>
 
-        <div class="dashboard-grid">
+        <div class="dashboard-grid client-focus-hidden">
           <section class="panel">
             <div class="section-title">
               <h3>Vendor 360</h3>
@@ -198,7 +200,7 @@
           </section>
         </div>
 
-        <div class="dashboard-grid">
+        <div class="dashboard-grid client-focus-hidden">
           <section class="panel">
             <div class="section-title">
               <h3>Vendor Risk Heatmap</h3>
@@ -232,8 +234,8 @@
       <section id="vendors" class="view" aria-labelledby="vendorsTitle">
         <div class="view-heading">
           <div>
-            <p class="eyebrow">Vendor Control</p>
-            <h2 id="vendorsTitle">Schedules, specialist handling, and PRISM weights</h2>
+            <p class="eyebrow">Vendor Portfolio</p>
+            <h2 id="vendorsTitle">Vendor setup and PRISM assessment</h2>
           </div>
         </div>
         <form class="vendor-form panel" id="vendorForm">
@@ -611,7 +613,7 @@
             <h2 id="sourcesTitle">Manage credible signal sources</h2>
           </div>
         </div>
-        <form class="source-form" id="sourceForm">
+        <form class="source-form presentation-sensitive" id="sourceForm">
           <input id="sourceName" type="text" placeholder="Source name" required>
           <input id="sourceUrl" type="url" placeholder="https://source.example" required>
           <select id="sourceCategory">
@@ -644,8 +646,8 @@
       <section id="internal" class="view" aria-labelledby="internalTitle">
         <div class="view-heading">
           <div>
-            <p class="eyebrow">Amadeus Internal Data Gate</p>
-            <h2 id="internalTitle">Upload or paste internal vendor evidence</h2>
+            <p class="eyebrow">Internal Evidence Gate</p>
+            <h2 id="internalTitle">Add internal vendor evidence</h2>
           </div>
         </div>
         <div class="internal-grid">
@@ -727,10 +729,10 @@
       <section id="connectors" class="view" aria-labelledby="connectorsTitle">
         <div class="view-heading">
           <div>
-            <p class="eyebrow">Integration Shell</p>
-            <h2 id="connectorsTitle">Connector status and failed feeds</h2>
+            <p class="eyebrow">Data Integrations</p>
+            <h2 id="connectorsTitle">Connected procurement data and feed status</h2>
           </div>
-          <button class="primary-btn" id="simulateFailureBtn" type="button">Simulate failure</button>
+          <button class="primary-btn presentation-sensitive" id="simulateFailureBtn" type="button">Test monitoring alert</button>
         </div>
         <div class="metric-grid" id="connectorMetrics"></div>
         <div class="connector-grid" id="connectorGrid"></div>
@@ -825,23 +827,23 @@
       <section id="monitoring" class="view" aria-labelledby="monitoringTitle">
         <div class="view-heading">
           <div>
-            <p class="eyebrow">Production Operations</p>
-            <h2 id="monitoringTitle">Health, uploads, and AI explainability</h2>
+            <p class="eyebrow">Data Operations</p>
+            <h2 id="monitoringTitle">Freshness, issues, ownership, and next action</h2>
           </div>
         </div>
         <div class="metric-grid" id="monitoringMetrics"></div>
         <div class="dashboard-grid">
           <section class="panel">
             <div class="section-title">
-              <h3>AI Explanation Panel</h3>
-              <span>Pending signals</span>
+              <h3>Connector Health</h3>
+              <span>Freshness and ownership</span>
             </div>
             <div class="audit-list" id="aiExplanationList"></div>
           </section>
           <section class="panel">
             <div class="section-title">
-              <h3>Data Upload History</h3>
-              <span>Internal gate activity</span>
+              <h3>Recent Data Activity</h3>
+              <span>Internal evidence and approved signals</span>
             </div>
             <div class="audit-list" id="uploadHistoryList"></div>
           </section>
@@ -862,7 +864,7 @@
         <div class="modal-content" id="actionModalContent"></div>
       </section>
     </div>
-    <script src="static-api.js?v=20260620-client-focus"></script>
-    <script src="app.js?v=20260620-client-focus"></script>
+    <script src="static-api.js?v=20260621-client-focus-release"></script>
+    <script src="app.js?v=20260621-client-focus-release"></script>
   </body>
 </html>

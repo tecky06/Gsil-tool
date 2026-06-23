@@ -1309,6 +1309,75 @@ textarea {
   align-content: start;
 }
 
+.document-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.evidence-upload-control {
+  padding: 14px;
+  border: 1px dashed #9aabb5;
+  border-radius: 8px;
+  background: #f7f9fa;
+}
+
+.evidence-upload-control input[type="file"] {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.evidence-upload-control span,
+.selected-evidence-file span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.selected-evidence-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-left: 3px solid var(--green);
+  border-radius: 4px;
+  background: rgba(28, 143, 90, 0.08);
+}
+
+.selected-evidence-file[hidden] {
+  display: none;
+}
+
+.attachment-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attachment-summary span {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.attachment-actions {
+  margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .document-metadata-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .history-chart {
   width: 100%;
   min-height: 260px;

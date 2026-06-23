@@ -293,6 +293,8 @@ function normalizeApiInternalInput(input) {
     ...input,
     id: String(input.id),
     vendorId: String(input.vendorId ?? input.vendor_id ?? ""),
+    feedType: input.feedType || input.feed_type || "Manual Input",
+    attachment: input.attachment || null,
     createdAt: input.createdAt || input.created_at || new Date().toISOString()
   };
 }
@@ -340,6 +342,9 @@ let state = {
 
 let autoPullTimer = null;
 let autoPullInFlight = false;
+let selectedInternalEvidenceFile = null;
+const internalEvidenceMaxBytes = 3 * 1024 * 1024;
+const internalEvidenceExtensions = new Set(["pdf", "docx", "xlsx", "csv", "pptx", "txt", "png", "jpg", "jpeg", "webp"]);
 const autoPullFrequencies = {
   manual: { label: "Manual only", ms: 0 },
   "15min": { label: "Every 15 minutes", ms: 15 * 60 * 1000 },
@@ -842,6 +847,40 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("The evidence document could not be read"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function clearSelectedEvidenceFile() {
+  selectedInternalEvidenceFile = null;
+  const input = $("#internalEvidenceFile");
+  if (input) input.value = "";
+  const summary = $("#selectedEvidenceFile");
+  if (summary) {
+    summary.hidden = true;
+    summary.innerHTML = "";
+  }
+}
+
+function validateInternalEvidenceFile(file) {
+  const extension = String(file?.name || "").split(".").pop().toLowerCase();
+  if (!internalEvidenceExtensions.has(extension)) throw new Error("Use PDF, DOCX, XLSX, CSV, PPTX, TXT, PNG, JPG or WEBP");
+  if (Number(file.size || 0) > internalEvidenceMaxBytes) throw new Error("Evidence documents must be 3 MB or smaller");
+  if (!file.size) throw new Error("The selected evidence document is empty");
 }
 
 function statusLabel(status) {
@@ -2433,11 +2472,59 @@ function renderSources() {
 
 function renderInternalFeed() {
   $("#internalFeed").innerHTML = state.internalInputs.map((input) => `
-    <article class="audit-item interactive-item" role="button" tabindex="0" data-open-vendor="${input.vendorId}">
-      <strong>${vendorById(input.vendorId)?.name || "Vendor"} · ${prismLabels[input.dimension]} · ${input.period}</strong>
-      <p>${input.evidence} Internal weighting: ${input.weight}%.</p>
+    <article class="audit-item">
+      <strong>${escapeHtml(vendorById(input.vendorId)?.name || "Vendor")} · ${escapeHtml(prismLabels[input.dimension])} · ${escapeHtml(input.period)}</strong>
+      <p>${escapeHtml(input.evidence)} Internal weighting: ${Number(input.weight || 0)}%.</p>
+      ${input.attachment ? `
+        <div class="attachment-summary">
+          <span>${escapeHtml(input.attachment.fileName || input.attachment.name || "Evidence document")}</span>
+          <span>${escapeHtml(input.attachment.category || "Supporting evidence")}</span>
+          <span>${escapeHtml(input.attachment.confidentiality || "Internal")}</span>
+          <span>${formatFileSize(input.attachment.sizeBytes || input.attachment.size)}</span>
+        </div>
+        <div class="attachment-actions">
+          <button class="secondary-btn" type="button" data-download-evidence="${escapeHtml(input.id)}">Download evidence</button>
+          <button class="secondary-btn" type="button" data-open-vendor="${escapeHtml(input.vendorId)}">Open vendor</button>
+        </div>
+      ` : `<div class="attachment-actions"><button class="secondary-btn" type="button" data-open-vendor="${escapeHtml(input.vendorId)}">Open vendor</button></div>`}
     </article>
   `).join("");
+}
+
+async function downloadInternalEvidence(inputId) {
+  const input = state.internalInputs.find((item) => sameId(item.id, inputId));
+  const attachment = input?.attachment;
+  if (!attachment) return toast("No evidence document is attached to this input");
+  if (attachment.dataUrl) {
+    const link = document.createElement("a");
+    link.href = attachment.dataUrl;
+    link.download = attachment.fileName || attachment.name || "gsil-evidence";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return;
+  }
+  const documentId = attachment.documentId || attachment.id;
+  if (!documentId) return toast("The evidence document reference is unavailable");
+  try {
+    const response = await fetch(apiUrl(`/api/evidence-documents/${encodeURIComponent(documentId)}/download`), { headers: roleHeaders() });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Evidence download failed");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attachment.fileName || "gsil-evidence";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    showOperationStatus(error.message, "error", true);
+    toast(error.message);
+  }
 }
 
 function renderAudit() {
@@ -3981,19 +4068,65 @@ function bindGlobalEvents() {
     };
     action("New source added", () => api.addSource(source)).then(() => event.target.reset());
   });
-  $("#internalForm").addEventListener("submit", (event) => {
+  $("#internalEvidenceFile").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return clearSelectedEvidenceFile();
+    try {
+      validateInternalEvidenceFile(file);
+      selectedInternalEvidenceFile = file;
+      const summary = $("#selectedEvidenceFile");
+      summary.hidden = false;
+      summary.innerHTML = `
+        <div><strong>${escapeHtml(file.name)}</strong><br><span>${escapeHtml(file.type || "Document")} · ${formatFileSize(file.size)}</span></div>
+        <button class="secondary-btn" id="removeEvidenceFile" type="button">Remove</button>
+      `;
+      showOperationStatus(`${file.name} is ready to attach`, "success", true);
+    } catch (error) {
+      clearSelectedEvidenceFile();
+      showOperationStatus(error.message, "error", true);
+      toast(error.message);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("#removeEvidenceFile")) clearSelectedEvidenceFile();
+    const downloadButton = event.target.closest("[data-download-evidence]");
+    if (downloadButton) downloadInternalEvidence(downloadButton.dataset.downloadEvidence);
+  });
+  $("#internalForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!requireUiPermission("internal:write", "Only Admin, Analyst, and Finance Controller can add internal evidence.")) return;
-    const input = {
-      vendorId: $("#internalVendor").value,
-      dimension: $("#internalDimension").value,
-      weight: Number($("#internalWeight").value),
-      period: $("#internalPeriod").value,
-      evidence: $("#internalEvidence").value.trim()
-    };
-    action("Internal input saved and score recalculated", () => api.addInternalInput(input)).then(() => {
+    const evidenceNote = $("#internalEvidence").value.trim();
+    const file = selectedInternalEvidenceFile;
+    if (!evidenceNote && !file) {
+      showOperationStatus("Add an evidence note or attach a document", "error", true);
+      return toast("Add an evidence note or attach a document");
+    }
+    await action("Internal evidence saved and score recalculated", async () => {
+      const attachment = file ? {
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        dataUrl: await fileToDataUrl(file),
+        category: $("#internalDocumentCategory").value,
+        confidentiality: $("#internalConfidentiality").value,
+        owner: $("#internalEvidenceOwner").value.trim(),
+        expiryDate: $("#internalExpiryDate").value || null
+      } : null;
+      return api.addInternalInput({
+        vendorId: $("#internalVendor").value,
+        dimension: $("#internalDimension").value,
+        weight: Number($("#internalWeight").value),
+        period: $("#internalPeriod").value,
+        feedType: attachment ? "Document Upload" : "Manual Input",
+        evidence: evidenceNote || `Attached ${attachment.category}: ${attachment.fileName}.`,
+        attachment
+      });
+    }).then(() => {
       $("#internalEvidence").value = "";
-    });
+      $("#internalEvidenceOwner").value = "";
+      $("#internalExpiryDate").value = "";
+      clearSelectedEvidenceFile();
+    }).catch(() => {});
   });
   on("#qbrBtn", "click", async () => {
     if (!requireUiPermission("qbr:write", "This role cannot generate QBR snapshots in the demo.")) return;

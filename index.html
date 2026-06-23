@@ -675,9 +675,45 @@
               Period
               <input id="internalPeriod" type="month" value="2026-06">
             </label>
+            <div class="document-metadata-grid">
+              <label>
+                Document category
+                <select id="internalDocumentCategory">
+                  <option>SLA / Performance Report</option>
+                  <option>Audit / Compliance Report</option>
+                  <option>Commercial / Spend Evidence</option>
+                  <option>Contract / Renewal Document</option>
+                  <option>QBR / Governance Pack</option>
+                  <option>Delivery / Remediation Plan</option>
+                  <option>Other Evidence</option>
+                </select>
+              </label>
+              <label>
+                Confidentiality
+                <select id="internalConfidentiality">
+                  <option>Internal</option>
+                  <option>Confidential</option>
+                  <option>Restricted</option>
+                </select>
+              </label>
+              <label>
+                Evidence owner
+                <input id="internalEvidenceOwner" type="text" placeholder="Team or document owner">
+              </label>
+              <label>
+                Expiry / review date
+                <input id="internalExpiryDate" type="date">
+              </label>
+            </div>
+            <label class="evidence-upload-control" for="internalEvidenceFile">
+              Evidence document
+              <input id="internalEvidenceFile" type="file" accept=".pdf,.docx,.xlsx,.csv,.pptx,.txt,.png,.jpg,.jpeg,.webp">
+              <span>PDF, DOCX, XLSX, CSV, PPTX, TXT or image · maximum 3 MB</span>
+            </label>
+            <div class="selected-evidence-file" id="selectedEvidenceFile" hidden></div>
             <label>
-              Evidence
-              <textarea id="internalEvidence" rows="7" placeholder="Paste SLA breach notes, CSAT summary, invoice insight, audit finding, or delivery update" required></textarea>
+              Evidence note
+              <textarea id="internalEvidence" rows="5" placeholder="Add the key finding, metric, threshold, or reviewer context. Optional when a document is attached."></textarea>
             </label>
             <button class="primary-btn" type="submit">Save and recalculate</button>
           </form>
@@ -864,7 +900,7 @@
         <div class="modal-content" id="actionModalContent"></div>
       </section>
     </div>
-    <script src="static-api.js?v=20260621-client-focus-release"></script>
-    <script src="app.js?v=20260621-client-focus-release"></script>
+    <script src="static-api.js?v=20260623-evidence-upload"></script>
+    <script src="app.js?v=20260623-evidence-upload"></script>
   </body>
 </html>

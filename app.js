@@ -1,8 +1,9 @@
 const api = {
   async request(path, options = {}) {
+    const { headers: optionHeaders = {}, ...requestOptions } = options;
     const response = await fetch(apiUrl(path), {
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options
+      ...requestOptions,
+      headers: { "Content-Type": "application/json", ...optionHeaders }
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Request failed");
@@ -1441,16 +1442,9 @@ function openSignalWorkspace(signalId) {
       <h3>Recommended playbook</h3>
       <p>${playbookForSignal(signal)}</p>
     </div>
-    ${vendor ? `
-      <div class="modal-section">
-        <h3>Decision workflow</h3>
-        ${decisionButtons(vendor.id)}
-      </div>
-    ` : ""}
     <div class="modal-actions">
-      ${actionButton("openApprovalGate", signal.id, "Open in Approval Gate", "primary-btn")}
-      ${actionButton("validateSignal", signal.id, "Mark evidence validated")}
-      ${actionButton("requestSignalClarification", signal.id, "Request clarification")}
+      <button class="primary-btn" data-modal-action="approveSignal" data-action-id="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Approve</button>
+      <button class="secondary-btn" data-modal-action="rejectSignal" data-action-id="${signal.id}" type="button" ${disabledIfNo("signal:reject")}>Reject</button>
     </div>
   `);
 }
@@ -1685,6 +1679,25 @@ async function handleModalAction(button) {
     renderCompareMatrix();
     closeActionModal();
     toast("Opened vendor comparison");
+    return;
+  }
+  if (actionName === "approveSignal") {
+    if (!requireUiPermission("signal:approve", "Only Admin and Procurement Head can approve score-changing signals.")) return;
+    const signal = state.signals.find((item) => sameId(item.id, id));
+    if (!signal) return;
+    await action("Signal approved and PRISM recalculated", () => api.approveSignal(signal.id, {
+      summary: signal.summary,
+      dimension: signal.dimension,
+      impact: signal.impact
+    }));
+    closeActionModal();
+    return;
+  }
+  if (actionName === "rejectSignal") {
+    if (!requireUiPermission("signal:reject", "This role cannot reject signals in the Approval Gate.")) return;
+    if (!window.confirm("Reject this signal? It will be removed from the pending Approval Gate.")) return;
+    await action("Signal rejected", () => api.rejectSignal(id, "Reviewer rejected signal during gate review."));
+    closeActionModal();
     return;
   }
   if (["decisionApprove", "decisionSendBack", "decisionEscalate", "decisionDefer", "decisionEvidence"].includes(actionName)) {
@@ -2377,7 +2390,6 @@ function renderSignals() {
         </details>
         <div class="signal-actions">
           <button class="primary-btn" data-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Approve</button>
-          <button class="secondary-btn" data-edit-approve="${signal.id}" type="button" ${disabledIfNo("signal:approve")}>Edit & approve</button>
           <button class="secondary-btn" data-reject="${signal.id}" type="button" ${disabledIfNo("signal:reject")}>Reject</button>
         </div>
       </article>
@@ -2407,12 +2419,6 @@ function bindSignalEvents() {
     button.addEventListener("click", () => {
       if (!requireUiPermission("signal:approve", "Only Admin and Procurement Head can approve score-changing signals.")) return;
       action("Signal approved and PRISM recalculated", () => api.approveSignal(button.dataset.approve, signalPayload(button.dataset.approve)));
-    });
-  });
-  $$("[data-edit-approve]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!requireUiPermission("signal:approve", "Only Admin and Procurement Head can approve score-changing signals.")) return;
-      action("Edited signal approved", () => api.approveSignal(button.dataset.editApprove, signalPayload(button.dataset.editApprove)));
     });
   });
   $$("[data-reject]").forEach((button) => {

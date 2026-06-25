@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GSIL - Global Signal Intelligence Layer</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260626-vendor-relationship">
   </head>
   <body>
     <section class="login-screen" id="loginScreen">
@@ -241,6 +241,14 @@
         <form class="vendor-form panel" id="vendorForm">
           <input id="vendorName" type="text" placeholder="Vendor name" required>
           <input id="vendorCategory" type="text" placeholder="Category" required>
+          <select id="vendorRelationshipType" aria-label="Vendor relationship type">
+            <option value="direct">Direct Vendor</option>
+            <option value="external_watchlist">External Watchlist</option>
+            <option value="potential_supplier">Potential Supplier</option>
+            <option value="former_vendor">Former Vendor</option>
+            <option value="competitor_benchmark">Competitor Benchmark</option>
+            <option value="strategic_market_entity">Strategic Market Entity</option>
+          </select>
           <select id="vendorTier">
             <option>Strategic</option>
             <option>Core</option>
@@ -900,7 +908,7 @@
         <div class="modal-content" id="actionModalContent"></div>
       </section>
     </div>
-    <script src="static-api.js?v=20260623-signal-actions-fix"></script>
-    <script src="app.js?v=20260623-signal-actions-fix"></script>
+    <script src="static-api.js?v=20260626-vendor-relationship"></script>
+    <script src="app.js?v=20260626-vendor-relationship"></script>
   </body>
 </html>

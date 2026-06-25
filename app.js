@@ -85,6 +85,45 @@ const statusTerms = {
   red: { label: "Executive Attention", metric: "Attention Vendors", action: "Escalate owner action", tone: "Intervene" }
 };
 
+const vendorRelationshipTypes = {
+  direct: {
+    label: "Direct Vendor",
+    scoreType: "Full PRISM",
+    coverage: "Full evidence",
+    note: "Internal and external evidence can influence PRISM."
+  },
+  external_watchlist: {
+    label: "External Watchlist",
+    scoreType: "Market-only",
+    coverage: "Limited evidence",
+    note: "Tracked for credible external signals; internal performance evidence is not available yet."
+  },
+  potential_supplier: {
+    label: "Potential Supplier",
+    scoreType: "Market-only",
+    coverage: "Limited evidence",
+    note: "Useful for RFP shortlisting and capability monitoring."
+  },
+  former_vendor: {
+    label: "Former Vendor",
+    scoreType: "Historical/market",
+    coverage: "Partial evidence",
+    note: "Can retain historical context and continue market monitoring."
+  },
+  competitor_benchmark: {
+    label: "Competitor Benchmark",
+    scoreType: "Benchmark-only",
+    coverage: "Limited evidence",
+    note: "Used for comparison, not active supplier performance scoring."
+  },
+  strategic_market_entity: {
+    label: "Strategic Market Entity",
+    scoreType: "Market-only",
+    coverage: "Limited evidence",
+    note: "Tracked for category, capability, or market movement."
+  }
+};
+
 const connectorTerms = {
   healthy: "Connected",
   degraded: "Attention Needed",
@@ -222,6 +261,11 @@ function normalizeApiVendor(vendor) {
   const score = rawScore === undefined || rawScore === null || rawScore === ""
     ? calculateVendorScore(vendor)
     : Number(rawScore);
+  const metadata = vendor.metadata || {};
+  const relationshipType = metadata.relationshipType || metadata.relationship_type || vendor.relationshipType || "direct";
+  const relationship = vendorRelationshipTypes[relationshipType] ? relationshipType : "direct";
+  const evidenceCoverage = metadata.evidenceCoverage || metadata.evidence_coverage || vendorRelationshipTypes[relationship].coverage;
+  const scoreType = metadata.scoreType || metadata.score_type || vendorRelationshipTypes[relationship].scoreType;
   return {
     ...vendor,
     id: String(vendor.id),
@@ -230,7 +274,16 @@ function normalizeApiVendor(vendor) {
     history: vendor.history || [score],
     lastPull: vendor.lastPull || vendor.updated_at || "Backend sync",
     nextPull: vendor.nextPull || (vendor.schedule === "Manual" ? "Manual only" : "Backend controlled"),
-    status: vendor.status || (score >= 7.8 ? "green" : score >= 6.6 ? "amber" : "red")
+    status: vendor.status || (score >= 7.8 ? "green" : score >= 6.6 ? "amber" : "red"),
+    relationshipType: relationship,
+    evidenceCoverage,
+    scoreType,
+    metadata: {
+      ...metadata,
+      relationshipType: relationship,
+      evidenceCoverage,
+      scoreType
+    }
   };
 }
 
@@ -886,6 +939,18 @@ function validateInternalEvidenceFile(file) {
 
 function statusLabel(status) {
   return statusTerms[status]?.label || String(status || "Unclassified");
+}
+
+function vendorRelationship(vendor) {
+  return vendorRelationshipTypes[vendor?.relationshipType] || vendorRelationshipTypes.direct;
+}
+
+function isMarketOnlyVendor(vendor) {
+  return vendor?.relationshipType && vendor.relationshipType !== "direct";
+}
+
+function vendorScoreLabel(vendor) {
+  return isMarketOnlyVendor(vendor) ? "Market score" : "PRISM score";
 }
 
 function connectorLabel(status) {
@@ -2170,6 +2235,7 @@ function renderVendorCards() {
   $("#vendorGrid").innerHTML = vendors.map((vendor) => {
     const score = scoreVendor(vendor);
     const degrees = Math.round((score / 10) * 360);
+    const relationship = vendorRelationship(vendor);
     const dimensions = Object.entries(vendor.dimensions).map(([key, value]) => `
       <div class="dimension" title="${prismLabels[key]}">
         <span>${key}</span>
@@ -2182,6 +2248,10 @@ function renderVendorCards() {
           <div>
             <h4>${vendor.specialist ? "★ " : ""}${vendor.name}</h4>
             <span class="muted">${vendor.category}</span>
+            <div class="badge-row">
+              <span class="badge relationship">${relationship.label}</span>
+              <span class="badge evidence">${vendor.scoreType || relationship.scoreType}</span>
+            </div>
           </div>
           <span class="badge ${vendor.status}">${statusLabel(vendor.status)}</span>
         </div>
@@ -2189,8 +2259,12 @@ function renderVendorCards() {
           <div>
             <p class="muted">${vendor.tier}</p>
             ${vendor.specialist ? '<span class="badge specialist">Specialist Partner</span>' : ""}
+            ${isMarketOnlyVendor(vendor) ? `<small class="score-note">${relationship.note}</small>` : ""}
           </div>
-          <div class="donut" style="background:conic-gradient(var(--${vendor.status}) 0deg ${degrees}deg,#e7ecef ${degrees}deg 360deg)"><span>${score.toFixed(1)}</span></div>
+          <div>
+            <div class="donut" style="background:conic-gradient(var(--${vendor.status}) 0deg ${degrees}deg,#e7ecef ${degrees}deg 360deg)"><span>${score.toFixed(1)}</span></div>
+            <small class="score-type">${vendorScoreLabel(vendor)}</small>
+          </div>
         </div>
         <div class="dimension-list">${dimensions}</div>
         <div class="vendor-meta">
@@ -2213,10 +2287,15 @@ function showAllVendorsBeforeRender() {
 
 function createVisibleVendorDraft(input) {
   const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const dimensions = input.specialist
+  const relationshipType = vendorRelationshipTypes[input.relationshipType] ? input.relationshipType : "direct";
+  const marketOnly = relationshipType !== "direct";
+  const dimensions = marketOnly
+    ? { P: 6.6, R: 6.8, I: 6.4, S: 6.6, M: 7.6 }
+    : input.specialist
     ? { P: 7, R: 7, I: 8, S: 7, M: 8 }
     : { P: 7, R: 7, I: 7, S: 7, M: 7 };
   const score = calculateVendorScore({ dimensions, specialist: input.specialist });
+  const relationship = vendorRelationshipTypes[relationshipType];
   return normalizeApiVendor({
     id,
     name: input.name,
@@ -2224,13 +2303,19 @@ function createVisibleVendorDraft(input) {
     tier: input.tier,
     schedule: input.schedule,
     specialist: input.specialist,
+    relationshipType,
     dimensions,
     score,
     history: [score],
     status: score >= 7.8 ? "green" : score >= 6.6 ? "amber" : "red",
     lastPull: "Newly added",
     nextPull: input.schedule === "Manual" ? "Manual only" : input.schedule === "Weekly" ? "Next week 02:00" : "Tomorrow 02:00",
-    metadata: { syncStatus: "Pending backend sync" }
+    metadata: {
+      syncStatus: "Pending backend sync",
+      relationshipType,
+      evidenceCoverage: relationship.coverage,
+      scoreType: relationship.scoreType
+    }
   });
 }
 
@@ -2240,6 +2325,10 @@ function renderVendorTable() {
       <div>
         <strong>${vendor.name}</strong>
         <div class="muted">${vendor.category}</div>
+        <div class="badge-row">
+          <span class="badge relationship">${vendorRelationship(vendor).label}</span>
+          <span class="badge evidence">${vendor.evidenceCoverage || vendorRelationship(vendor).coverage}</span>
+        </div>
       </div>
       <span class="badge ${vendor.status}">${statusLabel(vendor.status)}</span>
       <div class="schedule-control">
@@ -2253,7 +2342,10 @@ function renderVendorTable() {
         <input type="checkbox" data-specialist="${vendor.id}" ${vendor.specialist ? "checked" : ""} ${disabledIfNo("vendor:write")}>
         Specialist
       </label>
-      <strong>${scoreVendor(vendor).toFixed(1)}</strong>
+      <div class="score-cell">
+        <strong>${scoreVendor(vendor).toFixed(1)}</strong>
+        <small>${vendorScoreLabel(vendor)}</small>
+      </div>
     </article>
   `).join("");
   $$("[data-specialist]").forEach((checkbox) => {
@@ -4005,9 +4097,15 @@ function bindGlobalEvents() {
     const vendor = {
       name: $("#vendorName").value.trim(),
       category: $("#vendorCategory").value.trim(),
+      relationshipType: $("#vendorRelationshipType").value,
       tier: $("#vendorTier").value,
       schedule: $("#vendorSchedule").value,
-      specialist: $("#vendorSpecialist").checked
+      specialist: $("#vendorSpecialist").checked,
+      metadata: {
+        relationshipType: $("#vendorRelationshipType").value,
+        evidenceCoverage: vendorRelationshipTypes[$("#vendorRelationshipType").value]?.coverage,
+        scoreType: vendorRelationshipTypes[$("#vendorRelationshipType").value]?.scoreType
+      }
     };
     if (!vendor.name || !vendor.category) {
       toast("Vendor name and category are required");

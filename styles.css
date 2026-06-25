@@ -1065,6 +1065,23 @@ textarea:disabled {
   background: var(--violet);
 }
 
+.badge.relationship {
+  background: #e8f1f6;
+  color: #24495c;
+}
+
+.badge.evidence {
+  background: #f2efe6;
+  color: #6b5626;
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .donut {
   width: 88px;
   height: 88px;
@@ -1119,6 +1136,26 @@ textarea:disabled {
   font-size: 0.86rem;
 }
 
+.score-note,
+.score-type,
+.score-cell small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.score-note {
+  max-width: 260px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.score-cell {
+  text-align: right;
+}
+
 .vendor-table {
   display: grid;
   gap: 10px;
@@ -1126,7 +1163,7 @@ textarea:disabled {
 
 .vendor-form {
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) minmax(190px, 1fr) 130px 130px 130px 120px;
+  grid-template-columns: minmax(170px, 1fr) minmax(190px, 1fr) minmax(180px, 0.9fr) 130px 130px 130px 120px;
   gap: 10px;
   align-items: center;
   margin-bottom: 14px;

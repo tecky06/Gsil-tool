@@ -861,18 +861,31 @@ app.post("/api/qbr", handleQbrRequest);
 
 app.post("/api/vendors", async (req, res) => {
   try {
-    const { name, category, tier = "Core", schedule = "Daily", specialist = false } = req.body;
+    const { name, category, tier = "Core", schedule = "Daily", specialist = false, relationshipType = "direct" } = req.body;
     if (!name || !category) {
       return res.status(400).json({ error: "Vendor name and category are required" });
     }
+    const marketOnly = relationshipType !== "direct";
+    const dimensions = marketOnly
+      ? { P: 6.6, R: 6.8, I: 6.4, S: 6.6, M: 7.6 }
+      : specialist
+        ? { P: 7, R: 7, I: 8, S: 7, M: 8 }
+        : { P: 7, R: 7, I: 7, S: 7, M: 7 };
+    const score = Number(calculatePrismScore(dimensions, specialist).toFixed(2));
+    const metadata = {
+      ...(req.body.metadata || {}),
+      relationshipType,
+      evidenceCoverage: marketOnly ? "Limited evidence" : "Full evidence",
+      scoreType: marketOnly ? "Market-only" : "Full PRISM"
+    };
 
     const result = await query(
       `
-        insert into vendors (name, category, tier, schedule, specialist)
-        values ($1, $2, $3, $4, $5)
+        insert into vendors (name, category, tier, schedule, specialist, dimensions, prism_score, status, metadata)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         returning *
       `,
-      [name, category, tier, schedule, specialist]
+      [name, category, tier, schedule, specialist, JSON.stringify(dimensions), score, statusFromScore(score), JSON.stringify(metadata)]
     );
 
     await query(
@@ -882,9 +895,9 @@ app.post("/api/vendors", async (req, res) => {
       `,
       [
         actorFromRequest(req, "Vendor Creator"),
-        `${name} added as a ${tier} vendor.`,
+        `${name} added as a ${tier} vendor (${metadata.scoreType}).`,
         result.rows[0].id,
-        JSON.stringify({ category, schedule, specialist })
+        JSON.stringify({ category, schedule, specialist, relationshipType, scoreType: metadata.scoreType })
       ]
     );
     res.status(201).json({ vendor: result.rows[0], state: await statePayload() });
@@ -912,6 +925,12 @@ app.patch("/api/vendors/:id", async (req, res) => {
       ...(existing.metadata || {}),
       ...(patch.metadata || {})
     };
+    if (patch.relationshipType !== undefined) {
+      nextMetadata.relationshipType = String(patch.relationshipType);
+      const marketOnly = nextMetadata.relationshipType !== "direct";
+      nextMetadata.evidenceCoverage = marketOnly ? "Limited evidence" : "Full evidence";
+      nextMetadata.scoreType = marketOnly ? "Market-only" : "Full PRISM";
+    }
 
     if (!nextName || !nextCategory) {
       return res.status(400).json({ error: "Vendor name and category are required" });
